@@ -8,8 +8,10 @@ convention. Steps:
    lists "MK-3475" with other name "pembrolizumab" links the two names.
 2. Work out when each drug was first marketed: its first FDA approval (Drugs@FDA)
    or its first Phase 4 trial, whichever is earlier.
-3. Group industry-sponsored trials by (drug, therapeutic area). Phase 1 trials with
-   no disease (healthy volunteers) join the same drug's disease programs.
+3. Group industry-sponsored trials by (drug, therapeutic area). Supporting Phase 1
+   studies (healthy volunteers, liver or kidney impairment, drug interactions,
+   bioequivalence, food effect, QT, mass balance) join the same drug's disease
+   programs instead of forming programs of their own.
 4. Infer the stage history (first trial start per phase) and approval: the program(s)
    that got furthest before the drug was marketed are the ones it was approved for.
    Status is discontinued once nothing has happened for INACTIVE_YEARS, unless a
@@ -17,12 +19,13 @@ convention. Steps:
 5. Flag which programs count toward benchmarks: only those that started before the
    drug was marketed. That leaves out comparators, probe drugs in interaction
    studies, background therapy and new uses of old drugs, which would otherwise
-   show up as thousands of "failed" programs.
+   show up as thousands of "failed" programs. Vaccines and cell and gene therapies
+   are left out too: FDA's CBER approves them and they aren't in Drugs@FDA, so their
+   approvals can't be seen and they would all look like failures.
 6. Upsert the programs as assets with source "ctgov", plus stage events and trial links.
 
-Known limits: approvals outside the US and CBER biologics (most vaccines, cell and
-gene therapies) are only seen through Phase 4 trials, and the regulatory stage itself
-is not observable on ClinicalTrials.gov.
+Known limits: approvals outside the US are only seen through Phase 4 trials, and the
+regulatory stage itself is not observable on ClinicalTrials.gov.
 """
 
 import re
@@ -120,6 +123,46 @@ def drug_names(intervention: dict) -> list[tuple[str, list[str]]]:
     parts = [p for p in parts if p]
     # Aliases only describe the intervention as a whole when it names a single drug.
     return [(p, aliases if len(parts) == 1 else []) for p in parts]
+
+
+# Words too generic to identify a drug on their own when matching against FDA names.
+_STOPWORDS = {
+    "insulin", "vaccine", "extended", "release", "delayed", "modified", "recombinant", "human",
+    "injection", "injectable", "tablet", "tablets", "capsule", "capsules", "placebo", "matching",
+    "solution", "acting", "formulation", "combination", "therapy", "standard", "pediatric",
+    "adjuvanted", "conjugate", "liquid", "powder", "topical", "ophthalmic", "nasal", "inhaled",
+    "inhalation", "pegylated", "liposomal", "generic", "reference", "product", "fixed", "dose",
+}  # fmt: skip
+
+
+def name_candidates(name: str) -> set[str]:
+    """Keys to try against FDA names: the whole name, plus its distinctive words and word
+    pairs, so "Rivaroxaban Xarelto" matches "rivaroxaban" and "Faster-acting insulin aspart"
+    matches "insulin aspart"."""
+    words = re.findall(r"[a-z0-9]+", _SALTS.sub(" ", name.lower()))
+    keys = {name_key(name)}
+    keys |= {w for w in words if len(w) >= 6 and w not in _STOPWORDS and not w.isdigit()}
+    keys |= {a + b for a, b in zip(words, words[1:], strict=False) if len(a) >= 3 and len(b) >= 3}
+    return keys
+
+
+# Phase 1 studies that support a drug's development rather than test it in a disease.
+_SUPPORT_TITLE = re.compile(
+    r"bioequivalen|bioavailability|drug[- ]drug interaction|drug interaction|interaction (study )?"
+    r"(between|with)|food effect|effect of food|fed and fasted|fasted and fed|hepatic(ally)? impair|"
+    r"renal(ly)? impair|renal insufficiency|hepatic insufficiency|thorough qt|\bqtc?\b|mass balance|"
+    r"absorption, metabolism|excretion|radiolabel|14c|healthy (adult |male |female |elderly )?"
+    r"(japanese |chinese |korean |caucasian )?(volunteers|subjects|participants|adults)",
+    re.IGNORECASE,
+)
+_SUPPORT_CONDITION = re.compile(
+    r"healthy|hepatic impairment|renal impairment|renal insufficiency|hepatic insufficiency|"
+    r"bioequivalence|bioavailability|drug interaction",
+    re.IGNORECASE,
+)
+_VACCINE = re.compile(r"vaccin|immunogenicity|toxoid", re.IGNORECASE)
+# Approved by FDA's CBER, so not in Drugs@FDA: approvals aren't visible to us.
+UNOBSERVED_APPROVAL_MODALITIES = {Modality.VACCINE, Modality.CELL_THERAPY, Modality.GENE_THERAPY}
 
 
 class _Aliases:
@@ -306,6 +349,15 @@ class TrialRow:
     start_date: date | None
     completion_date: date | None
     last_update: date | None
+    title: str = ""
+
+    @property
+    def supporting(self) -> bool:
+        """A supporting Phase 1 study (see _SUPPORT_TITLE), not a test in a disease."""
+        return self.phase == Stage.PHASE1 and bool(
+            _SUPPORT_TITLE.search(self.title or "")
+            or any(_SUPPORT_CONDITION.search(c) for c in self.conditions)
+        )
 
     @property
     def started(self) -> date | None:
@@ -342,10 +394,20 @@ class Program:
         return min((t.started for t in self.clinical_trials), default=None)
 
     @property
+    def modality(self) -> Modality:
+        vaccine_trials = sum(bool(_VACCINE.search(t.title or "")) for t in self.trials)
+        if any(_VACCINE.search(n) for n in self.names) or vaccine_trials * 2 > len(self.trials):
+            return Modality.VACCINE
+        return guess_modality(self.names, self.biological)
+
+    @property
     def eligible(self) -> bool:
-        """Counts toward benchmarks: development started before the drug was on the market."""
+        """Counts toward benchmarks: development started before the drug was on the market,
+        and approval would be visible to us."""
         first = self.first_entry
-        return first is not None and (self.marketed_on is None or first < self.marketed_on)
+        if first is None or self.modality in UNOBSERVED_APPROVAL_MODALITIES:
+            return False
+        return self.marketed_on is None or first < self.marketed_on
 
     def furthest_before(self, when: date) -> Stage | None:
         stages = [t.phase for t in self.clinical_trials if t.started < when]
@@ -394,6 +456,7 @@ def build_programs(trials: Iterable[TrialRow], approvals: dict[str, date] | None
     approvals = approvals or {}
     aliases = _Aliases()
     trial_drugs: list[tuple[TrialRow, list[tuple[list[str], str, bool]]]] = []
+    candidates: dict[str, set[str]] = defaultdict(set)
     for t in trials:
         drugs = []
         for intervention in t.interventions:
@@ -402,6 +465,8 @@ def build_programs(trials: Iterable[TrialRow], approvals: dict[str, date] | None
                 aliases.find(key)
                 for other in others:
                     aliases.union(key, name_key(other))
+                for n in (name, *others):
+                    candidates[key] |= name_candidates(n)
                 drugs.append(([name, *others], key, intervention.get("type") == "BIOLOGICAL"))
         trial_drugs.append((t, drugs))
 
@@ -413,21 +478,26 @@ def build_programs(trials: Iterable[TrialRow], approvals: dict[str, date] | None
         if root not in marketed or when < marketed[root]:
             marketed[root] = when
 
-    for key in list(aliases.parent):
-        if key in approvals:
-            mark(aliases.find(key), approvals[key])
+    for key, keys in candidates.items():
+        for candidate in keys:
+            if candidate in approvals:
+                mark(aliases.find(key), approvals[candidate])
     for t, drugs in trial_drugs:
         if t.phase == Stage.APPROVED and t.started:
             for _, key, _ in drugs:
                 mark(aliases.find(key), t.started)
 
     programs: dict[tuple[str, str], Program] = {}
+    supporting: dict[str, list[tuple[TrialRow, list[str], bool]]] = defaultdict(list)
     for t, drugs in trial_drugs:
         if t.sponsor_class != "INDUSTRY":
             continue
         area = classify_area(t.condition_terms, t.conditions)
         for names, key, biological in drugs:
             root = aliases.find(key)
+            if t.supporting:
+                supporting[root].append((t, names, biological))
+                continue
             program = programs.setdefault((root, area), Program(key=f"{root}|{area}"[:200], area=area))
             program.add(t, names, biological)
 
@@ -437,6 +507,11 @@ def build_programs(trials: Iterable[TrialRow], approvals: dict[str, date] | None
 
     result = []
     for root, drug_programs in by_drug.items():
+        # Supporting studies belong to every disease program of the drug. A drug that only
+        # ever had supporting studies (e.g. a bioequivalence test) never gets a program.
+        for p in drug_programs:
+            for t, names, biological in supporting.get(root, []):
+                p.add(t, names, biological)
         # Healthy-volunteer Phase 1 studies have no disease; they belong to the drug's
         # disease programs, not to a separate "other" program that looks like it stalled.
         other = [p for p in drug_programs if p.area == "other"]
@@ -469,7 +544,7 @@ def load_trials(session: Session) -> Iterable[TrialRow]:
     columns = [
         Trial.id, Trial.phase, Trial.overall_status, Trial.lead_sponsor, Trial.sponsor_class,
         Trial.conditions, Trial.condition_terms, Trial.interventions,
-        Trial.start_date, Trial.completion_date, Trial.last_update,
+        Trial.start_date, Trial.completion_date, Trial.last_update, Trial.title,
     ]  # fmt: skip
     for row in session.execute(select(*columns).where(Trial.phase.is_not(None))).yield_per(5000):
         yield TrialRow(*row)
@@ -502,7 +577,7 @@ def save_programs(session: Session, programs: list[Program], today: date) -> int
                 "source": SOURCE,
                 "name": p.name,
                 "synonyms": [n for n, _ in p.names.most_common(10) if n != p.name],
-                "modality": guess_modality(p.names, p.biological),
+                "modality": p.modality,
                 "therapeutic_area": p.area,
                 "indication": p.indication(),
                 "stage": stage,
@@ -556,7 +631,12 @@ def save_programs(session: Session, programs: list[Program], today: date) -> int
 
 def _summary(p: Program, sponsor: str | None) -> str:
     text = f"Built from {len(p.trials)} ClinicalTrials.gov trial(s). Sponsor: {sponsor}."
-    if p.marketed_on and not p.eligible:
+    if p.modality in UNOBSERVED_APPROVAL_MODALITIES:
+        text += (
+            " Not counted in benchmarks: approvals of vaccines and cell and gene therapies"
+            " aren't in our FDA data."
+        )
+    elif p.marketed_on and not p.eligible:
         text += f" Drug already on the market since {p.marketed_on.year}; not counted in benchmarks."
     return text
 

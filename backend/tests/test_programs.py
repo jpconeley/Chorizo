@@ -64,20 +64,20 @@ def test_dated_outcomes_ignore_stages_entered_after_approval():
 
 
 def _trial(nct, phase, drug, *, status="COMPLETED", start="2015-01-01", sponsor_class="INDUSTRY", others=(),
-           also=None, healthy=False):  # fmt: skip
+           also=None, healthy=False, title=None, conditions=None):  # fmt: skip
     y, m, d = map(int, start.split("-"))
     drugs = [{"type": "DRUG", "name": drug, "other_names": list(others)}]
     if also:
         drugs.append({"type": "DRUG", "name": also, "other_names": []})
     return {
         "nct_id": nct,
-        "title": f"{drug} trial",
+        "title": title or f"{drug} trial",
         "phase": phase,
         "overall_status": status,
         "why_stopped": None,
         "lead_sponsor": "Example Bio" if sponsor_class == "INDUSTRY" else "Some University",
         "sponsor_class": sponsor_class,
-        "conditions": ["Healthy Volunteers"] if healthy else ["Ulcerative Colitis"],
+        "conditions": conditions or (["Healthy Volunteers"] if healthy else ["Ulcerative Colitis"]),
         "condition_terms": [] if healthy else ["Inflammatory Bowel Diseases"],
         "interventions": drugs + [{"type": "DRUG", "name": "Placebo", "other_names": []}],
         "enrollment": 100,
@@ -95,6 +95,15 @@ def imported(session):
         _trial("NCT2", Stage.PHASE2, "exampleumab 10 mg", start="2012-01-01"),
         _trial("NCT3", Stage.PHASE3, "EX-1", start="2014-01-01"),
         _trial("NCT4", Stage.APPROVED, "Exampleumab", start="2019-01-01"),
+        # A liver-impairment study is supporting work, not a liver-disease program.
+        _trial(
+            "NCT16",
+            Stage.PHASE1,
+            "EX-1",
+            start="2013-06-01",
+            conditions=["Hepatic Impairment"],
+            title="Pharmacokinetics of EX-1 in Subjects With Hepatic Impairment",
+        ),  # fmt: skip
         # EX-2: stopped after Phase 2 long ago -> discontinued. Later a drug-interaction
         # study in healthy volunteers uses midazolam as a probe.
         _trial("NCT5", Stage.PHASE1, "EX-2", start="2011-01-01"),
@@ -104,6 +113,20 @@ def imported(session):
         # EX-3: healthy-volunteer Phase 1, then Phase 2 still recruiting -> active, undecided.
         _trial("NCT13", Stage.PHASE1, "EX-3", start="2024-01-01", healthy=True),
         _trial("NCT7", Stage.PHASE2, "EX-3", start="2025-01-01", status="RECRUITING"),
+        # Mesalamine is background therapy in an EX-3 trial; it's been marketed for decades.
+        _trial("NCT14", Stage.PHASE2, "EX-3", start="2025-02-01", also="Mesalamine", status="RECRUITING"),
+        _trial("NCT15", Stage.APPROVED, "Mesalamine", start="2004-01-01", sponsor_class="OTHER"),
+        # A vaccine: approvals aren't visible, so it's shown but not benchmarked.
+        _trial(
+            "NCT17",
+            Stage.PHASE3,
+            "FluShield",
+            start="2012-01-01",
+            conditions=["Influenza"],
+            title="Immunogenicity and Safety of FluShield in Adults",
+        ),  # fmt: skip
+        # Only ever tested for bioequivalence: never becomes a program.
+        _trial("NCT18", Stage.PHASE1, "CKD-999", title="Bioequivalence of CKD-999 and Co-administration"),
         # EX-5: Phase 1 and 3, no Phase 4 trial, but FDA approved it as exfivib.
         _trial("NCT9", Stage.PHASE1, "EX-5", start="2010-01-01", others=["exfivib"]),
         _trial("NCT10", Stage.PHASE3, "EX-5", start="2013-01-01"),
@@ -112,7 +135,7 @@ def imported(session):
     ]
     upsert_trials(session, records)
     fda.save_approvals(session, {"exfivib": ("Exfivib", date(2016, 5, 1), "NDA000001")})
-    assert programs.run(session, today=TODAY) == 5
+    assert programs.run(session, today=TODAY) == 6
     return session
 
 
@@ -122,21 +145,21 @@ def _assets(session):
 
 def test_programs_built_from_trials(imported):
     assets = _assets(imported)
-    assert set(assets) == {"Exampleumab", "EX-2", "EX-3", "Exfivib", "Midazolam"}
+    assert set(assets) == {"Exampleumab", "EX-2", "EX-3", "Exfivib", "Mesalamine", "FluShield"}
 
     ex1 = assets["Exampleumab"]
     assert ex1.stage == Stage.APPROVED
     assert ex1.therapeutic_area == "immunology"
     assert ex1.modality == Modality.ANTIBODY
     assert ex1.organization.name == "Example Bio"
-    assert len(ex1.trials) == 4
+    assert len(ex1.trials) == 5  # including the supporting liver-impairment study
     assert [e.stage for e in ex1.stage_history][:3] == [Stage.PHASE1, Stage.PHASE2, Stage.PHASE3]
 
     assert assets["EX-2"].status == AssetStatus.DISCONTINUED
     assert assets["EX-3"].status == AssetStatus.ACTIVE
 
     # Re-running is idempotent.
-    assert programs.run(imported, today=TODAY) == 5
+    assert programs.run(imported, today=TODAY) == 6
     assert imported.scalar(select(Asset).where(Asset.name == "Exampleumab")).id == ex1.id
 
 
@@ -144,7 +167,7 @@ def test_healthy_volunteer_phase1_joins_disease_program(imported):
     ex3 = _assets(imported)["EX-3"]
     assert ex3.therapeutic_area == "immunology"
     assert {e.stage for e in ex3.stage_history} == {Stage.PHASE1, Stage.PHASE2}
-    assert len(ex3.trials) == 2
+    assert len(ex3.trials) == 3
 
 
 def test_fda_approval_marks_program_approved(imported):
@@ -157,9 +180,45 @@ def test_fda_approval_marks_program_approved(imported):
 
 def test_already_marketed_drugs_are_not_benchmarked(imported):
     assets = _assets(imported)
-    assert not assets["Midazolam"].benchmark_eligible  # probe drug, marketed since 2005
-    assert "not counted in benchmarks" in assets["Midazolam"].summary
+    assert not assets["Mesalamine"].benchmark_eligible  # background therapy, marketed since 2004
+    assert "not counted in benchmarks" in assets["Mesalamine"].summary
     assert assets["EX-2"].benchmark_eligible
+
+
+def test_supporting_studies_never_form_programs(imported):
+    assets = _assets(imported)
+    assert "Midazolam" not in assets  # probe drug in a drug-interaction study
+    assert "CKD-999" not in assets  # only ever in a bioequivalence study
+    assert {a.therapeutic_area for a in assets.values()} <= {"immunology", "infectious_disease"}
+
+
+def test_vaccines_are_shown_but_not_benchmarked(imported):
+    flu = _assets(imported)["FluShield"]
+    assert flu.modality == Modality.VACCINE
+    assert not flu.benchmark_eligible
+    assert "vaccines" in flu.summary
+
+
+def test_fda_matching_uses_name_words_and_brands():
+    assert "rivaroxaban" in programs.name_candidates("Rivaroxaban Xarelto")
+    assert "insulinaspart" in programs.name_candidates("Faster-acting insulin aspart")
+    assert "insulin" not in programs.name_candidates("Insulin Peglispro")
+    approvals = fda.first_approvals(
+        [
+            {
+                "application_number": "NDA202439",
+                "products": [{"brand_name": "XARELTO", "active_ingredients": [{"name": "RIVAROXABAN"}]}],
+                "submissions": [
+                    {
+                        "submission_type": "ORIG",
+                        "submission_status": "AP",
+                        "submission_status_date": "20110701",
+                    }
+                ],
+            }
+        ]
+    )
+    assert approvals["xarelto"][1] == approvals["rivaroxaban"][1] == date(2011, 7, 1)
 
 
 def test_benchmarks_and_estimates_from_programs(imported):
@@ -226,6 +285,7 @@ def test_fda_first_approvals():
 
 def test_diagnostics_report_runs(imported):
     text = diagnostics.report(imported)
-    assert "FDA-approved ingredients loaded: 1" in text
+    assert "FDA-approved ingredients and brands loaded: 1" in text
+    assert "1 vaccines/cell/gene therapies" in text
     assert "phase2 failures counted: 1" in text  # EX-2
     assert "EX-2" in text

@@ -1,4 +1,4 @@
-"""First FDA approval date per active ingredient, from Drugs@FDA via openFDA.
+"""First FDA approval date per active ingredient and brand name, from Drugs@FDA via openFDA.
 
 Docs: https://open.fda.gov/apis/drug/drugsfda/
 
@@ -55,8 +55,11 @@ def first_approvals(applications: Iterable[dict[str, Any]]) -> dict[str, tuple[s
             continue
         when = min(approved)
         for product in app.get("products") or []:
-            for ingredient in product.get("active_ingredients") or []:
-                name = (ingredient.get("name") or "").strip()
+            # Brand names too: trials often name a drug "Rivaroxaban (Xarelto)" or just "Xarelto".
+            names = [i.get("name") for i in product.get("active_ingredients") or []]
+            names.append(product.get("brand_name"))
+            for name in names:
+                name = (name or "").strip()
                 key = name_key(name) if name else ""
                 if key and (key not in best or when < best[key][1]):
                     best[key] = (name.title(), when, number)

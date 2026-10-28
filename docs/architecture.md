@@ -48,7 +48,10 @@ who sees what, and a fast, dense UI sits on top.
 2. **Marketed date:** the drug's first FDA approval (Drugs@FDA, `ingest/fda.py`) or its first
    Phase 4 trial by any sponsor, whichever is earlier.
 3. **Programs:** industry-sponsored trials grouped by drug and therapeutic area (from MeSH
-   condition terms). Phase 1 trials in healthy volunteers join the same drug's disease programs.
+   condition terms). Supporting Phase 1 studies (healthy volunteers, liver or kidney impairment,
+   drug interactions, bioequivalence, food effect, QT, mass balance) join the same drug's disease
+   programs; a drug that only ever had supporting studies gets no program. FDA matching also tries
+   brand names and the distinctive words in a name ("Rivaroxaban Xarelto" matches rivaroxaban).
 4. **Stage history and approval:** the first trial start in each phase. The program(s) that got
    furthest before the drug was marketed are marked approved on the marketed date; other programs
    only count as approved if they have their own Phase 4 trial.
@@ -57,12 +60,17 @@ who sees what, and a fast, dense UI sits on top.
 6. **Benchmark eligibility:** only programs that started before the drug was marketed count
    toward success rates. Comparators, probe drugs in interaction studies, background therapy and
    new uses of old drugs are still shown, but would otherwise appear as thousands of "failed"
-   programs.
+   programs. Vaccines and cell and gene therapies are excluded too: FDA's CBER approves them and
+   they aren't in Drugs@FDA, so every one would look like a failure.
+
+`chorizo diagnose` prints how programs are classified and what the counted failures at each
+stage have in common, with examples. Use it whenever the rates look off.
 
 Known limits, roughly in order of impact:
 
-- Approvals outside the US, and CBER biologics (most vaccines, cell and gene therapies, which
-  aren't in Drugs@FDA), are only detected through Phase 4 trials.
+- Approvals outside the US are only detected through Phase 4 trials, so drugs approved only in
+  Europe, Japan or China look like failures.
+- Benchmarks cover drugs and therapeutic biologics, not vaccines or cell and gene therapies.
 - Filing outcomes aren't on ClinicalTrials.gov, so the regulatory step always uses the published
   BIO rate.
 - Name matching is heuristic; some aliases won't merge and a few unrelated names may.

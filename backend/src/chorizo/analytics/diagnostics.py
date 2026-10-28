@@ -41,6 +41,7 @@ def report(session: Session) -> str:
             Asset.stage,
             Asset.status,
             Asset.benchmark_eligible,
+            Asset.summary,
             Organization.name,
         )
         .outerjoin(Organization, Asset.organization_id == Organization.id)
@@ -64,10 +65,12 @@ def report(session: Session) -> str:
         furthest[drug_of[r.id]] = max(furthest[drug_of[r.id]], STAGE_ORDER.index(r.stage))
 
     eligible = [r for r in rows if r.benchmark_eligible]
+    excluded = [r for r in rows if not r.benchmark_eligible]
+    cber = sum("vaccines" in (r.summary or "") for r in excluded)
     out = [
-        f"FDA-approved ingredients loaded: {len(approvals):,}",
-        f"Programs: {len(rows):,} total, {len(eligible):,} counted in benchmarks, "
-        f"{len(rows) - len(eligible):,} excluded as already-marketed drugs",
+        f"FDA-approved ingredients and brands loaded: {len(approvals):,}",
+        f"Programs: {len(rows):,} total, {len(eligible):,} counted in benchmarks; excluded: "
+        f"{len(excluded) - cber:,} already-marketed drugs, {cber:,} vaccines/cell/gene therapies",
         "",
         "Counted programs by furthest stage (active / discontinued):",
     ]
@@ -94,14 +97,22 @@ def report(session: Session) -> str:
             f"  only one trial in the program: {_pct(single, n)}",
             f"  entered this stage before 2008: {_pct(old, n)}, in 2016 or later: {_pct(recent, n)}",
         ]
-        sponsors = Counter(r[8] for r in failed if r[8]).most_common(8)
+        sponsors = Counter(r.name_1 for r in failed if r.name_1).most_common(8)
         out.append("  top sponsors: " + ", ".join(f"{s} ({c})" for s, c in sponsors))
         sample = sorted(failed, key=lambda r: -trial_counts.get(r.id, 0))[:12]
         out.append("  most-tested examples (name | area | sponsor | trials | entered):")
         for r in sample:
             when = first_entry.get((r.id, stage))
             out.append(
-                f"    {r.name[:28]:<28} | {r.therapeutic_area[:12]:<12} | {(r[8] or '-')[:24]:<24} | "
+                f"    {r.name[:28]:<28} | {r.therapeutic_area[:12]:<12} | {(r.name_1 or '-')[:24]:<24} | "
                 f"{trial_counts.get(r.id, 0):>4} | {when.year if when else '-'}"
+            )
+        singles = [r for r in failed if trial_counts.get(r.id, 0) == 1]
+        out.append("  random single-trial examples (name | area | sponsor | entered):")
+        for r in sorted(singles, key=lambda r: (r.id * 2654435761) % 2**32)[:12]:
+            when = first_entry.get((r.id, stage))
+            out.append(
+                f"    {r.name[:28]:<28} | {r.therapeutic_area[:12]:<12} | {(r.name_1 or '-')[:24]:<24} | "
+                f"{when.year if when else '-'}"
             )
     return "\n".join(out)
