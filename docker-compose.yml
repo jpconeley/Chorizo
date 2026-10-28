@@ -1,3 +1,5 @@
+# Local development stack. `docker compose up -d --build` runs the database,
+# API (http://localhost:8000) and web app (http://localhost:3000) with demo data.
 services:
   db:
     image: postgres:16
@@ -13,6 +15,28 @@ services:
       test: ["CMD-SHELL", "pg_isready -U chorizo"]
       interval: 5s
       retries: 10
+
+  api:
+    build: ./backend
+    environment:
+      CHORIZO_DATABASE_URL: postgresql+psycopg://chorizo:chorizo@db:5432/chorizo
+      CHORIZO_JWT_SECRET: local-dev-secret-do-not-use-in-production
+      CHORIZO_WEB_URL: http://localhost:3000
+      CHORIZO_SEED_DEMO: "1"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./web
+    environment:
+      CHORIZO_API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
 
 volumes:
   pgdata:

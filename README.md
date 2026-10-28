@@ -17,7 +17,20 @@ docs/       Architecture and product notes
 
 ## Run locally
 
-Needs Docker, [uv](https://docs.astral.sh/uv/) and [pnpm](https://pnpm.io/).
+The easiest way needs only [Docker Desktop](https://www.docker.com/products/docker-desktop) (works
+on Windows, Mac and Linux):
+
+```bash
+docker compose up -d --build
+```
+
+Then open http://localhost:3000. The API is on http://localhost:8000 (docs at `/docs`). The first
+run takes a few minutes to build. Run `docker compose up -d --build` again after pulling new code,
+and `docker compose down` to stop.
+
+### Without Docker for the app
+
+For day-to-day development with hot reload, you need Docker (for Postgres), [uv](https://docs.astral.sh/uv/) and [pnpm](https://pnpm.io/):
 
 ```bash
 make setup                         # install dependencies
