@@ -159,7 +159,10 @@ def run(
     """Import drug trials. Calls progress(seen, imported) after each batch."""
     seen = imported = 0
     batch: list[dict[str, Any]] = []
-    headers = {"User-Agent": "Chorizo/0.1 (+https://github.com/jpconeley/chorizo)", "Accept": "application/json"}
+    headers = {
+        "User-Agent": "Chorizo/0.1 (+https://github.com/jpconeley/chorizo)",
+        "Accept": "application/json",
+    }
     with httpx.Client(base_url=get_settings().ctgov_base_url, timeout=120, headers=headers) as client:
         for study in fetch_studies(client, query=query, max_pages=max_pages):
             seen += 1
