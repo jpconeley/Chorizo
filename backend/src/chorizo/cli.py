@@ -9,7 +9,7 @@ import httpx
 from chorizo import seed
 from chorizo.analytics import service
 from chorizo.db import get_sessionmaker
-from chorizo.ingest import ctgov, programs
+from chorizo.ingest import ctgov, fda, programs
 
 
 def _progress(started: float):
@@ -34,6 +34,10 @@ def main() -> None:
         sub.add_argument(
             "--max-pages", type=int, help="Stop after N pages of 1,000 studies (for a quick test)"
         )
+    commands.add_parser("ingest-fda", help="Import first FDA approval dates from Drugs@FDA")
+    commands.add_parser(
+        "refresh-analytics", help="Re-import FDA approvals and rebuild everything except the trial import"
+    )
     commands.add_parser("build-programs", help="Group imported trials into drug programs")
     commands.add_parser("compute-benchmarks", help="Recompute stage benchmarks from drug programs")
     commands.add_parser("refresh-estimates", help="Recompute per-asset probability of success")
@@ -41,7 +45,7 @@ def main() -> None:
     try:
         run(args)
     except httpx.HTTPError as exc:
-        sys.exit(f"Could not reach ClinicalTrials.gov ({exc}). Check your internet connection and try again.")
+        sys.exit(f"Could not download data ({exc}). Check your internet connection and try again.")
 
 
 def run(args: argparse.Namespace) -> None:
@@ -55,6 +59,8 @@ def run(args: argparse.Namespace) -> None:
             case "ingest-ctgov":
                 count = ctgov.run(session, args.query, args.max_pages, _progress(time.monotonic()))
                 print(f"trials saved: {count:,}")
+            case "ingest-fda":
+                print(f"ingredients with an FDA approval: {fda.run(session):,}")
             case "build-programs":
                 print(f"programs: {programs.run(session):,}")
             case "compute-benchmarks":
@@ -63,15 +69,23 @@ def run(args: argparse.Namespace) -> None:
                 print(f"assets estimated: {service.refresh_estimates(session):,}")
             case "refresh-data":
                 started = time.monotonic()
-                print("1/4 Importing trials from ClinicalTrials.gov (the full import takes a while)...")
+                print("Importing trials from ClinicalTrials.gov (the full import takes a while)...")
                 ctgov.run(session, args.query, args.max_pages, _progress(started))
-                print("2/4 Building drug programs...")
-                print(f"  {programs.run(session):,} programs")
-                print("3/4 Computing stage benchmarks...")
-                print(f"  {service.recompute_benchmarks(session)} benchmark rows")
-                print("4/4 Estimating probability of success...")
-                print(f"  {service.refresh_estimates(session):,} assets estimated")
-                print(f"Done in {(time.monotonic() - started) / 60:.1f} min.")
+                _analytics(session, started)
+            case "refresh-analytics":
+                _analytics(session, time.monotonic())
+
+
+def _analytics(session, started: float) -> None:
+    print("1/4 Importing FDA approval dates...")
+    print(f"  {fda.run(session):,} approved ingredients")
+    print("2/4 Building drug programs...")
+    print(f"  {programs.run(session):,} programs")
+    print("3/4 Computing stage benchmarks...")
+    print(f"  {service.recompute_benchmarks(session)} benchmark rows")
+    print("4/4 Estimating probability of success...")
+    print(f"  {service.refresh_estimates(session):,} assets estimated")
+    print(f"Done in {(time.monotonic() - started) / 60:.1f} min.")
 
 
 if __name__ == "__main__":

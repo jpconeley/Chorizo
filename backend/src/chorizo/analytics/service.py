@@ -55,7 +55,7 @@ def _program_histories(session: Session) -> list[ProgramHistory]:
         row.id: row
         for row in session.execute(
             select(Asset.id, Asset.status, Asset.therapeutic_area, Asset.modality).where(
-                Asset.source == CTGOV_SOURCE
+                Asset.source == CTGOV_SOURCE, Asset.benchmark_eligible
             )
         )
     }

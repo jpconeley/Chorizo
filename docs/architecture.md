@@ -42,26 +42,32 @@ who sees what, and a fast, dense UI sits on top.
 `backend/src/chorizo/ingest/programs.py` turns ClinicalTrials.gov trials into drug programs
 (one drug in one therapeutic area, the BIO/Biomedtracker convention):
 
-1. **Drugs per trial:** split combinations ("A + B"), drop placebos and comparators, strip doses
-   and formulations, and normalize names so "MK 3475" matches "MK-3475". A trial's "other names"
-   link aliases, so a code name and its generic name end up as one drug.
-2. **Therapeutic area** from the trial's MeSH condition terms (oncology, immunology, neurology...).
-3. **Program filter:** at least one industry-sponsored trial. Investigator-led studies of
-   marketed drugs would otherwise swamp the data.
-4. **Stage history:** the first trial start in each phase. A Phase 4 trial means the drug is
-   approved (filing is inferred at the same date).
+1. **Drugs per trial:** split combinations ("A + B"), drop placebos and comparators, strip doses,
+   formulations and salts, and normalize names so "MK 3475" matches "MK-3475". A trial's "other
+   names" link aliases, so a code name and its generic name end up as one drug.
+2. **Marketed date:** the drug's first FDA approval (Drugs@FDA, `ingest/fda.py`) or its first
+   Phase 4 trial by any sponsor, whichever is earlier.
+3. **Programs:** industry-sponsored trials grouped by drug and therapeutic area (from MeSH
+   condition terms). Phase 1 trials in healthy volunteers join the same drug's disease programs.
+4. **Stage history and approval:** the first trial start in each phase. The program(s) that got
+   furthest before the drug was marketed are marked approved on the marketed date; other programs
+   only count as approved if they have their own Phase 4 trial.
 5. **Status:** discontinued when no trial is running and nothing has happened for three years;
    otherwise active.
+6. **Benchmark eligibility:** only programs that started before the drug was marketed count
+   toward success rates. Comparators, probe drugs in interaction studies, background therapy and
+   new uses of old drugs are still shown, but would otherwise appear as thousands of "failed"
+   programs.
 
 Known limits, roughly in order of impact:
 
-- Approval is only detected through Phase 4 trials. Approved drugs without a registered Phase 4
-  trial look stalled at Phase 3, which pushes Phase 3 success down. Adding FDA approval data fixes
-  this.
+- Approvals outside the US, and CBER biologics (most vaccines, cell and gene therapies, which
+  aren't in Drugs@FDA), are only detected through Phase 4 trials.
 - Filing outcomes aren't on ClinicalTrials.gov, so the regulatory step always uses the published
   BIO rate.
 - Name matching is heuristic; some aliases won't merge and a few unrelated names may.
 - Programs started recently are still undecided and don't count yet (right-censoring).
+- New indications of already-approved drugs aren't benchmarked, so rates describe new drugs.
 
 ## Probability of success
 

@@ -185,6 +185,9 @@ class Asset(TimestampMixin, Base):
     source: Mapped[str] = mapped_column(String(16), default="owner", index=True)
     # Stable identity for imported programs (normalized drug + therapeutic area).
     external_key: Mapped[str | None] = mapped_column(String(200), unique=True)
+    # False for programs of drugs that were already marketed when the program started
+    # (comparators, probe drugs, new uses of old drugs); they'd skew the benchmarks.
+    benchmark_eligible: Mapped[bool] = mapped_column(default=True, server_default="true")
 
     organization: Mapped[Organization | None] = relationship(back_populates="assets")
     stage_history: Mapped[list["StageEvent"]] = relationship(
@@ -229,6 +232,18 @@ class Trial(TimestampMixin, Base):
     start_date: Mapped[date | None] = mapped_column(Date)
     completion_date: Mapped[date | None] = mapped_column(Date)
     last_update: Mapped[date | None] = mapped_column(Date)
+
+
+class DrugApproval(Base):
+    """First FDA approval of an active ingredient, from Drugs@FDA (NDAs and BLAs only)."""
+
+    __tablename__ = "drug_approvals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ingredient_key: Mapped[str] = mapped_column(String(200), unique=True)  # see programs.name_key
+    ingredient: Mapped[str] = mapped_column(String(300))
+    first_approved_on: Mapped[date] = mapped_column(Date)
+    application_number: Mapped[str] = mapped_column(String(32))
 
 
 class AssetTrial(Base):

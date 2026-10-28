@@ -54,8 +54,16 @@ docker compose exec api chorizo refresh-data --max-pages 5   # quick test: first
 docker compose exec api chorizo refresh-data                 # full import, roughly 30–60 minutes
 ```
 
-Without Docker, run `uv run chorizo refresh-data` in `backend/`. The steps also run separately:
-`ingest-ctgov`, `build-programs`, `compute-benchmarks` and `refresh-estimates`.
+`refresh-data` also imports FDA approval dates from Drugs@FDA. To rebuild programs and success
+rates without re-importing every trial (after an update to the analytics), run:
+
+```bash
+docker compose exec api chorizo refresh-analytics
+```
+
+Without Docker, run the same commands with `uv run chorizo ...` in `backend/`. The steps also run
+separately: `ingest-ctgov`, `ingest-fda`, `build-programs`, `compute-benchmarks` and
+`refresh-estimates`.
 
 ## Tests
 

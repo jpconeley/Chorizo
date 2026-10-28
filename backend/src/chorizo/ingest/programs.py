@@ -3,23 +3,30 @@
 A program is one drug in one therapeutic area, following the BIO/Biomedtracker
 convention. Steps:
 
-1. Pull the investigational drugs out of each trial: split combinations, drop
-   placebos and comparators, normalize names, and merge aliases. A trial that lists
-   "MK-3475" with other name "pembrolizumab" links the two names.
-2. Classify each trial's therapeutic area from its MeSH condition terms.
-3. Group trials by (drug, area). Keep programs with at least one industry-sponsored
-   trial; investigator-led studies of marketed drugs are noise for benchmarks.
-4. Infer the stage history (first trial start per phase; a Phase 4 trial means the
-   drug is approved) and status (discontinued once nothing has happened for
-   INACTIVE_YEARS, unless a trial is still running).
-5. Upsert the programs as assets with source "ctgov", plus stage events and trial links.
+1. Pull the drugs out of each trial: split combinations, drop placebos and
+   comparators, normalize names (ignoring salts), and merge aliases. A trial that
+   lists "MK-3475" with other name "pembrolizumab" links the two names.
+2. Work out when each drug was first marketed: its first FDA approval (Drugs@FDA)
+   or its first Phase 4 trial, whichever is earlier.
+3. Group industry-sponsored trials by (drug, therapeutic area). Phase 1 trials with
+   no disease (healthy volunteers) join the same drug's disease programs.
+4. Infer the stage history (first trial start per phase) and approval: the program(s)
+   that got furthest before the drug was marketed are the ones it was approved for.
+   Status is discontinued once nothing has happened for INACTIVE_YEARS, unless a
+   trial is still running.
+5. Flag which programs count toward benchmarks: only those that started before the
+   drug was marketed. That leaves out comparators, probe drugs in interaction
+   studies, background therapy and new uses of old drugs, which would otherwise
+   show up as thousands of "failed" programs.
+6. Upsert the programs as assets with source "ctgov", plus stage events and trial links.
 
-Known limits: approval is only seen through Phase 4 trials (FDA data will fix
-that), and the regulatory stage itself is not observable on ClinicalTrials.gov.
+Known limits: approvals outside the US and CBER biologics (most vaccines, cell and
+gene therapies) are only seen through Phase 4 trials, and the regulatory stage itself
+is not observable on ClinicalTrials.gov.
 """
 
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
@@ -32,6 +39,7 @@ from chorizo.models import (
     Asset,
     AssetStatus,
     AssetTrial,
+    DrugApproval,
     Listing,
     Modality,
     Organization,
@@ -81,9 +89,22 @@ def clean_name(raw: str) -> str | None:
     return name if len(name) >= 3 else None
 
 
+_SALTS = re.compile(
+    r"\b(hydrochloride|dihydrochloride|hcl|hydrobromide|sodium|disodium|potassium|calcium|"
+    r"magnesium|mesylate|dimesylate|maleate|citrate|acetate|sulfate|sulphate|phosphate|tartrate|"
+    r"bitartrate|besylate|fumarate|succinate|bromide|chloride|tosylate|anhydrous|"
+    r"(mono|di|tri|hemi|sesqui)?hydrate)\b"
+)
+
+
 def name_key(name: str) -> str:
-    """Matching key: lowercase with spaces and hyphens removed, so 'MK 3475' == 'MK-3475'."""
-    return re.sub(r"[\s\-]", "", name.lower())
+    """Matching key: lowercase, salts dropped, spaces and hyphens removed.
+
+    'MK 3475' == 'MK-3475' and 'Metformin Hydrochloride' == 'metformin'.
+    """
+    lowered = name.lower()
+    key = re.sub(r"[\s\-]", "", _SALTS.sub(" ", lowered))
+    return key or re.sub(r"[\s\-]", "", lowered)
 
 
 def drug_names(intervention: dict) -> list[tuple[str, list[str]]]:
@@ -303,6 +324,32 @@ class Program:
     trials: list[TrialRow] = field(default_factory=list)
     names: Counter = field(default_factory=Counter)
     biological: bool = False
+    marketed_on: date | None = None  # when the drug was first marketed, for any use
+    approved_on: date | None = None  # when it was approved for this program
+
+    def add(self, trial: TrialRow, names: Iterable[str], biological: bool) -> None:
+        if all(t.id != trial.id for t in self.trials):
+            self.trials.append(trial)
+        self.names.update(names)
+        self.biological |= biological
+
+    @property
+    def clinical_trials(self) -> list[TrialRow]:
+        return [t for t in self.trials if t.phase != Stage.APPROVED and t.started]
+
+    @property
+    def first_entry(self) -> date | None:
+        return min((t.started for t in self.clinical_trials), default=None)
+
+    @property
+    def eligible(self) -> bool:
+        """Counts toward benchmarks: development started before the drug was on the market."""
+        first = self.first_entry
+        return first is not None and (self.marketed_on is None or first < self.marketed_on)
+
+    def furthest_before(self, when: date) -> Stage | None:
+        stages = [t.phase for t in self.clinical_trials if t.started < when]
+        return max(stages, key=STAGE_ORDER.index) if stages else None
 
     @property
     def name(self) -> str:
@@ -313,16 +360,17 @@ class Program:
 
     def stage_dates(self) -> dict[Stage, date]:
         entered: dict[Stage, date] = {}
-        for t in self.trials:
-            if t.started and (t.phase not in entered or t.started < entered[t.phase]):
+        for t in self.clinical_trials:
+            if t.phase not in entered or t.started < entered[t.phase]:
                 entered[t.phase] = t.started
-        if Stage.APPROVED in entered:
+        if self.approved_on:
+            entered[Stage.APPROVED] = self.approved_on
             # Filing isn't visible on ClinicalTrials.gov; approval implies it happened.
-            entered.setdefault(Stage.REGULATORY, entered[Stage.APPROVED])
+            entered.setdefault(Stage.REGULATORY, self.approved_on)
         return entered
 
     def status(self, today: date) -> AssetStatus:
-        if any(t.phase == Stage.APPROVED for t in self.trials):
+        if self.approved_on:
             return AssetStatus.ACTIVE
         if any(t.overall_status in RUNNING_STATUSES for t in self.trials):
             return AssetStatus.ACTIVE
@@ -341,34 +389,80 @@ class Program:
         return (counts.most_common(1)[0][0] if counts else "Unspecified")[:300]
 
 
-def build_programs(trials: Iterable[TrialRow]) -> list[Program]:
-    trials = list(trials)
+def build_programs(trials: Iterable[TrialRow], approvals: dict[str, date] | None = None) -> list[Program]:
+    """Group trials into programs. `approvals` maps name_key -> first FDA approval date."""
+    approvals = approvals or {}
     aliases = _Aliases()
-    trial_drugs: list[tuple[TrialRow, list[tuple[str, str, bool]]]] = []
+    trial_drugs: list[tuple[TrialRow, list[tuple[list[str], str, bool]]]] = []
     for t in trials:
         drugs = []
         for intervention in t.interventions:
             for name, others in drug_names(intervention):
                 key = name_key(name)
+                aliases.find(key)
                 for other in others:
                     aliases.union(key, name_key(other))
-                drugs.append((name, key, intervention.get("type") == "BIOLOGICAL"))
+                drugs.append(([name, *others], key, intervention.get("type") == "BIOLOGICAL"))
         trial_drugs.append((t, drugs))
+
+    # When each drug was first marketed: FDA approval of any alias, or its first Phase 4
+    # trial by any sponsor.
+    marketed: dict[str, date] = {}
+
+    def mark(root: str, when: date) -> None:
+        if root not in marketed or when < marketed[root]:
+            marketed[root] = when
+
+    for key in list(aliases.parent):
+        if key in approvals:
+            mark(aliases.find(key), approvals[key])
+    for t, drugs in trial_drugs:
+        if t.phase == Stage.APPROVED and t.started:
+            for _, key, _ in drugs:
+                mark(aliases.find(key), t.started)
 
     programs: dict[tuple[str, str], Program] = {}
     for t, drugs in trial_drugs:
+        if t.sponsor_class != "INDUSTRY":
+            continue
         area = classify_area(t.condition_terms, t.conditions)
-        seen: set[str] = set()
-        for name, key, biological in drugs:
+        for names, key, biological in drugs:
             root = aliases.find(key)
-            if root in seen:
-                continue
-            seen.add(root)
             program = programs.setdefault((root, area), Program(key=f"{root}|{area}"[:200], area=area))
-            program.trials.append(t)
-            program.names[name] += 1
-            program.biological |= biological
-    return [p for p in programs.values() if p.sponsor() is not None]
+            program.add(t, names, biological)
+
+    by_drug: dict[str, list[Program]] = defaultdict(list)
+    for (root, _), program in programs.items():
+        by_drug[root].append(program)
+
+    result = []
+    for root, drug_programs in by_drug.items():
+        # Healthy-volunteer Phase 1 studies have no disease; they belong to the drug's
+        # disease programs, not to a separate "other" program that looks like it stalled.
+        other = [p for p in drug_programs if p.area == "other"]
+        disease = [p for p in drug_programs if p.area != "other"]
+        if other and disease:
+            for p in disease:
+                for t in other[0].trials:
+                    p.add(t, [], other[0].biological)
+                p.names.update(other[0].names)
+            drug_programs = disease
+
+        when = marketed.get(root)
+        if when:
+            reached = {id(p): p.furthest_before(when) for p in drug_programs}
+            furthest = max((STAGE_ORDER.index(s) for s in reached.values() if s is not None), default=None)
+            for p in drug_programs:
+                p.marketed_on = when
+                stage = reached[id(p)]
+                if furthest is not None and stage is not None and STAGE_ORDER.index(stage) == furthest:
+                    p.approved_on = when
+                else:
+                    # A Phase 4 trial in this area means it's on the market for this use too.
+                    p4 = [t.started for t in p.trials if t.phase == Stage.APPROVED and t.started]
+                    p.approved_on = min(p4) if p4 else None
+        result += drug_programs
+    return result
 
 
 def load_trials(session: Session) -> Iterable[TrialRow]:
@@ -413,8 +507,9 @@ def save_programs(session: Session, programs: list[Program], today: date) -> int
                 "indication": p.indication(),
                 "stage": stage,
                 "status": p.status(today),
+                "benchmark_eligible": p.eligible,
                 "organization_id": orgs.get(sponsor[:200]) if sponsor else None,
-                "summary": f"Built from {len(p.trials)} ClinicalTrials.gov trial(s). Sponsor: {sponsor}.",
+                "summary": _summary(p, sponsor),
             }
         )
         history[p.key] = (entered, [t.id for t in p.trials])
@@ -459,6 +554,13 @@ def save_programs(session: Session, programs: list[Program], today: date) -> int
     return len(rows)
 
 
+def _summary(p: Program, sponsor: str | None) -> str:
+    text = f"Built from {len(p.trials)} ClinicalTrials.gov trial(s). Sponsor: {sponsor}."
+    if p.marketed_on and not p.eligible:
+        text += f" Drug already on the market since {p.marketed_on.year}; not counted in benchmarks."
+    return text
+
+
 def _chunks(items: list, size: int = 5000):
     for i in range(0, len(items), size):
         yield items[i : i + size]
@@ -466,4 +568,7 @@ def _chunks(items: list, size: int = 5000):
 
 def run(session: Session, today: date | None = None) -> int:
     today = today or date.today()
-    return save_programs(session, build_programs(load_trials(session)), today)
+    approvals = dict(
+        session.execute(select(DrugApproval.ingredient_key, DrugApproval.first_approved_on)).all()
+    )
+    return save_programs(session, build_programs(load_trials(session), approvals), today)

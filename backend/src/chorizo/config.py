@@ -25,6 +25,8 @@ class Settings(BaseSettings):
 
     # Data ingestion
     ctgov_base_url: str = "https://clinicaltrials.gov/api/v2"
+    openfda_base_url: str = "https://api.fda.gov"
+    openfda_download_index: str = "https://api.fda.gov/download.json"
 
 
 @lru_cache
