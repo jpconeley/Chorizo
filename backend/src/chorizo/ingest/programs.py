@@ -75,9 +75,32 @@ _DOSE = re.compile(r"\b\d+(\.\d+)?\s*(mg|mcg|µg|ug|g|ml|mg/kg|mg/m2|iu|units?|%
 _FORM = re.compile(
     r"\b(tablets?|capsules?|injections?|injectable|oral|iv|intravenous|subcutaneous|sc|infusion|"
     r"solution|suspension|cream|gel|ointment|patch|spray|high[- ]dose|low[- ]dose|dose|doses|"
-    r"extended[- ]release|er|xr|sr)\b",
+    r"extended[- ]release|er|xr|sr|suppositor(y|ies)|lozenges?|drops|sachets?|granules|syrup|"
+    r"chewable|effervescent|nasal|ophthalmic|topical|vaginal|rectal|transdermal|film[- ]coated|"
+    r"orally disintegrating|inhaler|inhalation|emulsion|foam|lotion|shampoo|mouthwash|gum)\b",
     re.IGNORECASE,
 )
+# Words that show up in intervention text but never name a drug by themselves.
+_JUNK = {
+    "after", "before", "baseline", "scored", "shape", "treatment", "period", "arm", "group",
+    "cohort", "part", "day", "days", "week", "weeks", "month", "months", "mo", "visit", "low",
+    "high", "medium", "single", "multiple", "ascending", "regimen", "maintenance", "induction",
+    "consolidation", "open", "label", "blinded", "active", "reference", "test", "fasting", "fed",
+    "morning", "evening", "daily", "once", "twice", "for", "of", "the", "in", "on", "and", "or",
+    "no", "menses", "association", "combination", "hot", "drink", "new", "old", "standard",
+    "optimized", "adjunct", "adjunctive", "add", "first", "second", "third", "line", "level",
+    "sequence", "crossover", "phase", "study", "trial", "intervention", "product", "formulation",
+    "monotherapy", "therapy", "extension", "prophylaxis", "conventional", "intensive", "control",
+    "fixed", "free", "only", "alone", "then", "followed", "by", "plus", "versus", "vs", "dex",
+}  # fmt: skip
+_CODE = re.compile(r"\b([a-z]{1,6})[- ]?\d+[a-z]?\b", re.IGNORECASE)
+
+
+def _has_code(name: str) -> bool:
+    """A drug code like "MK-3475", "BI 1356" or "AZD1656", but not "Part 2" or "Day 1"."""
+    return any(m.group(1).lower() not in _JUNK for m in _CODE.finditer(name))
+
+
 _SPLIT = re.compile(r"\s*(?:\+|/|,|;|\bplus\b|\band\b|\bwith\b|\bin combination with\b)\s*", re.IGNORECASE)
 
 
@@ -89,15 +112,40 @@ def clean_name(raw: str) -> str | None:
     name = _FORM.sub(" ", _DOSE.sub(" ", name))
     name = re.sub(r"[^\w\- ]", " ", name)
     name = re.sub(r"\s+", " ", name).strip(" -")
-    return name if len(name) >= 3 else None
+    words = re.findall(r"[a-z]+", name.lower())
+    if _has_code(name):
+        return name
+    if len(name) < 3 or not any(len(w) >= 3 for w in words) or all(w in _JUNK for w in words):
+        return None
+    return name
+
+
+def drug_like(name: str) -> bool:
+    """Whether a name identifies a specific drug: a code like "AZD1656" or "PF-04958242", or a
+    distinctive word like "faldaprevir". Fragments like "Dex" or "EMS association" don't."""
+    if _has_code(name):
+        return True
+    words = re.findall(r"[a-z]+", _SALTS.sub(" ", name.lower()))
+    return any(len(w) >= 6 and w not in _JUNK and w not in _STOPWORDS for w in words)
 
 
 _SALTS = re.compile(
     r"\b(hydrochloride|dihydrochloride|hcl|hydrobromide|sodium|disodium|potassium|calcium|"
     r"magnesium|mesylate|dimesylate|maleate|citrate|acetate|sulfate|sulphate|phosphate|tartrate|"
-    r"bitartrate|besylate|fumarate|succinate|bromide|chloride|tosylate|anhydrous|"
+    r"bitartrate|besylate|fumarate|succinate|bromide|chloride|tosylate|anhydrous|pamoate|embonate|"
+    r"dipropionate|propionate|valerate|palmitate|decanoate|lactate|gluconate|carbonate|oxalate|"
+    r"nitrate|malate|benzoate|xinafoate|iodide|meglumine|tromethamine|hyclate|"
     r"(mono|di|tri|hemi|sesqui)?hydrate)\b"
 )
+# International names that differ from US names in Drugs@FDA.
+_INN_TO_USAN = {
+    "paracetamol": "acetaminophen", "adrenaline": "epinephrine", "noradrenaline": "norepinephrine",
+    "salbutamol": "albuterol", "glibenclamide": "glyburide", "lignocaine": "lidocaine",
+    "frusemide": "furosemide", "ciclosporin": "cyclosporine", "rifampicin": "rifampin",
+    "pethidine": "meperidine", "aciclovir": "acyclovir", "valaciclovir": "valacyclovir",
+    "colecalciferol": "cholecalciferol", "mesalazine": "mesalamine", "oestradiol": "estradiol",
+    "beclometasone": "beclomethasone", "dexamfetamine": "dextroamphetamine",
+}  # fmt: skip
 
 
 def name_key(name: str) -> str:
@@ -143,6 +191,18 @@ def name_candidates(name: str) -> set[str]:
     keys = {name_key(name)}
     keys |= {w for w in words if len(w) >= 6 and w not in _STOPWORDS and not w.isdigit()}
     keys |= {a + b for a, b in zip(words, words[1:], strict=False) if len(a) >= 3 and len(b) >= 3}
+    return keys | {_INN_TO_USAN[k] for k in keys if k in _INN_TO_USAN}
+
+
+def fda_keys(ingredient: str) -> set[str]:
+    """Keys for an FDA ingredient name: the whole name, its first word (usually the active
+    moiety, as in "triptorelin pamoate") and its word pairs, so "methoxy polyethylene
+    glycol-epoetin beta" can match a trial's "epoetin beta pegol"."""
+    words = re.findall(r"[a-z0-9]+", _SALTS.sub(" ", ingredient.lower()))
+    keys = {name_key(ingredient)}
+    if words and len(words[0]) >= 7 and words[0] not in _STOPWORDS:
+        keys.add(words[0])
+    keys |= {a + b for a, b in zip(words, words[1:], strict=False) if len(a) >= 3 and len(b) >= 3}
     return keys
 
 
@@ -161,6 +221,14 @@ _SUPPORT_CONDITION = re.compile(
     re.IGNORECASE,
 )
 _VACCINE = re.compile(r"vaccin|immunogenicity|toxoid", re.IGNORECASE)
+# Blood and plasma products, also approved by CBER.
+_BLOOD_PRODUCT = re.compile(
+    r"\bfactor (vii|viii|ix|x|xiii)\b|factor (vii|viii|ix|x|xiii)a?\b|von willebrand|fibrin sealant|"
+    r"fibrinogen|\bthrombin\b|immune globulin|immunoglobulin|\bivig\b|\bscig\b|human albumin|"
+    r"albumin \(human\)|plasma[- ]derived|convalescent plasma|antithrombin|antitoxin|antivenom|"
+    r"prothrombin complex|c1[- ]esterase|alpha[- ]?1[- ]antitrypsin",
+    re.IGNORECASE,
+)
 # Approved by FDA's CBER, so not in Drugs@FDA: approvals aren't visible to us.
 UNOBSERVED_APPROVAL_MODALITIES = {Modality.VACCINE, Modality.CELL_THERAPY, Modality.GENE_THERAPY}
 
@@ -401,11 +469,22 @@ class Program:
         return guess_modality(self.names, self.biological)
 
     @property
+    def approval_unobservable(self) -> bool:
+        """Approved by FDA's CBER (vaccines, cell and gene therapies, blood products)."""
+        return self.modality in UNOBSERVED_APPROVAL_MODALITIES or any(
+            _BLOOD_PRODUCT.search(n) for n in self.names
+        )
+
+    @property
+    def drug_like(self) -> bool:
+        return any(drug_like(n) for n in self.names)
+
+    @property
     def eligible(self) -> bool:
-        """Counts toward benchmarks: development started before the drug was on the market,
-        and approval would be visible to us."""
+        """Counts toward benchmarks: a specific drug whose development started before it was
+        on the market, and whose approval would be visible to us."""
         first = self.first_entry
-        if first is None or self.modality in UNOBSERVED_APPROVAL_MODALITIES:
+        if first is None or self.approval_unobservable or not self.drug_like:
             return False
         return self.marketed_on is None or first < self.marketed_on
 
@@ -631,11 +710,13 @@ def save_programs(session: Session, programs: list[Program], today: date) -> int
 
 def _summary(p: Program, sponsor: str | None) -> str:
     text = f"Built from {len(p.trials)} ClinicalTrials.gov trial(s). Sponsor: {sponsor}."
-    if p.modality in UNOBSERVED_APPROVAL_MODALITIES:
+    if p.approval_unobservable:
         text += (
-            " Not counted in benchmarks: approvals of vaccines and cell and gene therapies"
-            " aren't in our FDA data."
+            " Not counted in benchmarks: approvals of vaccines, cell and gene therapies and"
+            " blood products aren't in our FDA data."
         )
+    elif not p.drug_like:
+        text += " Not counted in benchmarks: the name doesn't identify a specific drug."
     elif p.marketed_on and not p.eligible:
         text += f" Drug already on the market since {p.marketed_on.year}; not counted in benchmarks."
     return text

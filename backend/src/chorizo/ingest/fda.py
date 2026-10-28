@@ -21,7 +21,7 @@ from sqlalchemy import delete, insert
 from sqlalchemy.orm import Session
 
 from chorizo.config import get_settings
-from chorizo.ingest.programs import name_key
+from chorizo.ingest.programs import fda_keys
 from chorizo.models import DrugApproval
 
 log = logging.getLogger(__name__)
@@ -60,9 +60,9 @@ def first_approvals(applications: Iterable[dict[str, Any]]) -> dict[str, tuple[s
             names.append(product.get("brand_name"))
             for name in names:
                 name = (name or "").strip()
-                key = name_key(name) if name else ""
-                if key and (key not in best or when < best[key][1]):
-                    best[key] = (name.title(), when, number)
+                for key in fda_keys(name) if name else ():
+                    if key and (key not in best or when < best[key][1]):
+                        best[key] = (name.title(), when, number)
     return best
 
 

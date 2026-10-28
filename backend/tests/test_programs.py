@@ -127,6 +127,10 @@ def imported(session):
         ),  # fmt: skip
         # Only ever tested for bioequivalence: never becomes a program.
         _trial("NCT18", Stage.PHASE1, "CKD-999", title="Bioequivalence of CKD-999 and Co-administration"),
+        # A blood product (CBER), a bare dosage form and a vague product name.
+        _trial("NCT19", Stage.PHASE3, "Fibrin Sealant Vapor Heated", start="2002-01-01"),
+        _trial("NCT20", Stage.PHASE3, "Lozenges", start="2017-01-01"),
+        _trial("NCT21", Stage.PHASE3, "TULY Spray", start="2010-01-01"),
         # EX-5: Phase 1 and 3, no Phase 4 trial, but FDA approved it as exfivib.
         _trial("NCT9", Stage.PHASE1, "EX-5", start="2010-01-01", others=["exfivib"]),
         _trial("NCT10", Stage.PHASE3, "EX-5", start="2013-01-01"),
@@ -135,7 +139,7 @@ def imported(session):
     ]
     upsert_trials(session, records)
     fda.save_approvals(session, {"exfivib": ("Exfivib", date(2016, 5, 1), "NDA000001")})
-    assert programs.run(session, today=TODAY) == 6
+    assert programs.run(session, today=TODAY) == 8
     return session
 
 
@@ -145,7 +149,10 @@ def _assets(session):
 
 def test_programs_built_from_trials(imported):
     assets = _assets(imported)
-    assert set(assets) == {"Exampleumab", "EX-2", "EX-3", "Exfivib", "Mesalamine", "FluShield"}
+    assert set(assets) == {
+        "Exampleumab", "EX-2", "EX-3", "Exfivib", "Mesalamine", "FluShield",
+        "Fibrin Sealant Vapor Heated", "TULY",
+    }  # fmt: skip
 
     ex1 = assets["Exampleumab"]
     assert ex1.stage == Stage.APPROVED
@@ -159,7 +166,7 @@ def test_programs_built_from_trials(imported):
     assert assets["EX-3"].status == AssetStatus.ACTIVE
 
     # Re-running is idempotent.
-    assert programs.run(imported, today=TODAY) == 6
+    assert programs.run(imported, today=TODAY) == 8
     assert imported.scalar(select(Asset).where(Asset.name == "Exampleumab")).id == ex1.id
 
 
@@ -190,6 +197,31 @@ def test_supporting_studies_never_form_programs(imported):
     assert "Midazolam" not in assets  # probe drug in a drug-interaction study
     assert "CKD-999" not in assets  # only ever in a bioequivalence study
     assert {a.therapeutic_area for a in assets.values()} <= {"immunology", "infectious_disease"}
+
+
+def test_blood_products_and_vague_names_are_not_benchmarked(imported):
+    assets = _assets(imported)
+    assert not assets["Fibrin Sealant Vapor Heated"].benchmark_eligible
+    assert "blood products" in assets["Fibrin Sealant Vapor Heated"].summary
+    assert not assets["TULY"].benchmark_eligible
+    assert "doesn't identify a specific drug" in assets["TULY"].summary
+
+
+def test_junk_names_and_drug_like_names():
+    for junk in ["Suppositories", "Lozenges", "After", "Baseline", "2x 200", "20 6", "Dex nasal", "Part 2"]:
+        assert programs.clean_name(junk) is None, junk
+    for name in ["AZD1656", "PF-04958242", "BI 1356", "Faldaprevir", "Epoetin beta pegol"]:
+        assert programs.drug_like(name), name
+    for name in ["TULY", "EMS association", "SHAPE"]:
+        assert not programs.drug_like(name), name
+
+
+def test_fda_matching_handles_salts_inn_names_and_long_fda_names():
+    assert programs.name_key("Triptorelin Pamoate") == "triptorelin"
+    assert "triptorelin" in programs.fda_keys("TRIPTORELIN PAMOATE")
+    assert "acetaminophen" in programs.name_candidates("Paracetamol hot drink")
+    fda_side = programs.fda_keys("METHOXY POLYETHYLENE GLYCOL-EPOETIN BETA")
+    assert programs.name_candidates("Epoetin beta pegol") & fda_side == {"epoetinbeta"}
 
 
 def test_vaccines_are_shown_but_not_benchmarked(imported):
@@ -286,6 +318,6 @@ def test_fda_first_approvals():
 def test_diagnostics_report_runs(imported):
     text = diagnostics.report(imported)
     assert "FDA-approved ingredients and brands loaded: 1" in text
-    assert "1 vaccines/cell/gene therapies" in text
+    assert "2 vaccines/cell/gene/blood products, 1 vague names" in text
     assert "phase2 failures counted: 1" in text  # EX-2
     assert "EX-2" in text

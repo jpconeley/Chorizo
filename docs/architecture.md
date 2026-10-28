@@ -60,8 +60,11 @@ who sees what, and a fast, dense UI sits on top.
 6. **Benchmark eligibility:** only programs that started before the drug was marketed count
    toward success rates. Comparators, probe drugs in interaction studies, background therapy and
    new uses of old drugs are still shown, but would otherwise appear as thousands of "failed"
-   programs. Vaccines and cell and gene therapies are excluded too: FDA's CBER approves them and
-   they aren't in Drugs@FDA, so every one would look like a failure.
+   programs. Vaccines, cell and gene therapies and blood products are excluded too: FDA's CBER
+   approves them and they aren't in Drugs@FDA, so every one would look like a failure. So are
+   programs whose name doesn't identify a specific drug (a code like "AZD1656" or a distinctive
+   name like "faldaprevir"): fragments such as "Suppositories" or "EMS association" usually come
+   from new forms of old products by generic or consumer-health companies.
 
 `chorizo diagnose` prints how programs are classified and what the counted failures at each
 stage have in common, with examples. Use it whenever the rates look off.
@@ -70,7 +73,8 @@ Known limits, roughly in order of impact:
 
 - Approvals outside the US are only detected through Phase 4 trials, so drugs approved only in
   Europe, Japan or China look like failures.
-- Benchmarks cover drugs and therapeutic biologics, not vaccines or cell and gene therapies.
+- Benchmarks cover drugs and therapeutic biologics, not vaccines, cell and gene therapies or
+  blood products.
 - Filing outcomes aren't on ClinicalTrials.gov, so the regulatory step always uses the published
   BIO rate.
 - Name matching is heuristic; some aliases won't merge and a few unrelated names may.

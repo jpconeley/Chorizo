@@ -10,7 +10,7 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from chorizo.ingest.programs import SOURCE, name_key
+from chorizo.ingest.programs import SOURCE, name_candidates
 from chorizo.models import (
     STAGE_ORDER,
     Asset,
@@ -67,10 +67,12 @@ def report(session: Session) -> str:
     eligible = [r for r in rows if r.benchmark_eligible]
     excluded = [r for r in rows if not r.benchmark_eligible]
     cber = sum("vaccines" in (r.summary or "") for r in excluded)
+    vague = sum("doesn't identify" in (r.summary or "") for r in excluded)
     out = [
         f"FDA-approved ingredients and brands loaded: {len(approvals):,}",
         f"Programs: {len(rows):,} total, {len(eligible):,} counted in benchmarks; excluded: "
-        f"{len(excluded) - cber:,} already-marketed drugs, {cber:,} vaccines/cell/gene therapies",
+        f"{len(excluded) - cber - vague:,} already-marketed drugs, {cber:,} vaccines/cell/gene/blood "
+        f"products, {vague:,} vague names",
         "",
         "Counted programs by furthest stage (active / discontinued):",
     ]
@@ -84,7 +86,7 @@ def report(session: Session) -> str:
         n = len(failed)
         elsewhere = sum(furthest[drug_of[r.id]] > STAGE_ORDER.index(stage) for r in failed)
         names = lambda r: [r.name, *(r.synonyms or [])]  # noqa: E731
-        fda_named = sum(any(name_key(x) in approvals for x in names(r)) for r in failed)
+        fda_named = sum(any(name_candidates(x) & approvals for x in names(r)) for r in failed)
         started = [first_entry.get((r.id, stage)) for r in failed]
         recent = sum(1 for d in started if d and d.year >= 2016)
         old = sum(1 for d in started if d and d.year < 2008)
