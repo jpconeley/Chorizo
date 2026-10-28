@@ -7,7 +7,7 @@ import time
 import httpx
 
 from chorizo import seed
-from chorizo.analytics import service
+from chorizo.analytics import diagnostics, service
 from chorizo.db import get_sessionmaker
 from chorizo.ingest import ctgov, fda, programs
 
@@ -39,6 +39,7 @@ def main() -> None:
         "refresh-analytics", help="Re-import FDA approvals and rebuild everything except the trial import"
     )
     commands.add_parser("build-programs", help="Group imported trials into drug programs")
+    commands.add_parser("diagnose", help="Report how programs are classified, to sanity-check benchmarks")
     commands.add_parser("compute-benchmarks", help="Recompute stage benchmarks from drug programs")
     commands.add_parser("refresh-estimates", help="Recompute per-asset probability of success")
     args = parser.parse_args()
@@ -59,6 +60,8 @@ def run(args: argparse.Namespace) -> None:
             case "ingest-ctgov":
                 count = ctgov.run(session, args.query, args.max_pages, _progress(time.monotonic()))
                 print(f"trials saved: {count:,}")
+            case "diagnose":
+                print(diagnostics.report(session))
             case "ingest-fda":
                 print(f"ingredients with an FDA approval: {fda.run(session):,}")
             case "build-programs":

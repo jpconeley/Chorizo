@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from chorizo import seed
-from chorizo.analytics import service
+from chorizo.analytics import diagnostics, service
 from chorizo.analytics.benchmarks import ProgramHistory, outcomes
 from chorizo.ingest import fda, programs
 from chorizo.ingest.ctgov import upsert_trials
@@ -222,3 +222,10 @@ def test_fda_first_approvals():
     assert approvals["exfivib"][1:] == (date(2016, 5, 1), "NDA021000")
     assert approvals["otherdrug"][1] == date(2020, 1, 1)
     assert "genericol" not in approvals
+
+
+def test_diagnostics_report_runs(imported):
+    text = diagnostics.report(imported)
+    assert "FDA-approved ingredients loaded: 1" in text
+    assert "phase2 failures counted: 1" in text  # EX-2
+    assert "EX-2" in text
