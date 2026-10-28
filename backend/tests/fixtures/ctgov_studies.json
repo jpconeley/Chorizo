@@ -1,0 +1,38 @@
+{
+  "studies": [
+    {
+      "protocolSection": {
+        "identificationModule": {
+          "nctId": "NCT00000001",
+          "briefTitle": "EX-101 in Moderate Ulcerative Colitis",
+          "officialTitle": "A Phase 1/2 Study of EX-101 in Adults With Moderate Ulcerative Colitis"
+        },
+        "statusModule": {
+          "overallStatus": "RECRUITING",
+          "startDateStruct": { "date": "2023-05" },
+          "completionDateStruct": { "date": "2026-12-31" },
+          "lastUpdatePostDateStruct": { "date": "2025-01-10" }
+        },
+        "sponsorCollaboratorsModule": { "leadSponsor": { "name": "Example Bio" } },
+        "conditionsModule": { "conditions": ["Ulcerative Colitis"] },
+        "designModule": {
+          "phases": ["PHASE1", "PHASE2"],
+          "enrollmentInfo": { "count": 120 }
+        },
+        "armsInterventionsModule": {
+          "interventions": [{ "type": "DRUG", "name": "EX-101" }]
+        }
+      }
+    },
+    {
+      "protocolSection": {
+        "identificationModule": {
+          "nctId": "NCT00000002",
+          "briefTitle": "EX-202 Versus Placebo in Obesity"
+        },
+        "statusModule": { "overallStatus": "TERMINATED" },
+        "designModule": { "phases": ["PHASE3"] }
+      }
+    }
+  ]
+}
