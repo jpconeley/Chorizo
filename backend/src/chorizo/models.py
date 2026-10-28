@@ -180,6 +180,11 @@ class Asset(TimestampMixin, Base):
     uses_biomarker_selection: Mapped[bool] = mapped_column(default=False)
     orphan_designation: Mapped[bool] = mapped_column(default=False)
     summary: Mapped[str | None] = mapped_column(Text)
+    # Where the record came from: "owner" (listed on Chorizo), "ctgov" (built from
+    # ClinicalTrials.gov) or "demo". Benchmarks are computed from "ctgov" programs only.
+    source: Mapped[str] = mapped_column(String(16), default="owner", index=True)
+    # Stable identity for imported programs (normalized drug + therapeutic area).
+    external_key: Mapped[str | None] = mapped_column(String(200), unique=True)
 
     organization: Mapped[Organization | None] = relationship(back_populates="assets")
     stage_history: Mapped[list["StageEvent"]] = relationship(
@@ -214,7 +219,11 @@ class Trial(TimestampMixin, Base):
     phase: Mapped[Stage | None] = mapped_column(_enum(Stage), index=True)
     overall_status: Mapped[str] = mapped_column(String(48), index=True)
     lead_sponsor: Mapped[str | None] = mapped_column(String(300))
+    sponsor_class: Mapped[str | None] = mapped_column(String(32))  # INDUSTRY, NIH, OTHER, ...
+    why_stopped: Mapped[str | None] = mapped_column(Text)
     conditions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # MeSH terms for the conditions and their ancestors, used to classify therapeutic area.
+    condition_terms: Mapped[list[str]] = mapped_column(JSON, default=list)
     interventions: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     enrollment: Mapped[int | None] = mapped_column(Integer)
     start_date: Mapped[date | None] = mapped_column(Date)
@@ -228,7 +237,7 @@ class AssetTrial(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"))
-    trial_id: Mapped[int] = mapped_column(ForeignKey("trials.id", ondelete="CASCADE"))
+    trial_id: Mapped[int] = mapped_column(ForeignKey("trials.id", ondelete="CASCADE"), index=True)
 
     asset: Mapped[Asset] = relationship(back_populates="trials")
     trial: Mapped[Trial] = relationship()

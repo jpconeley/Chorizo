@@ -13,14 +13,21 @@
           "completionDateStruct": { "date": "2026-12-31" },
           "lastUpdatePostDateStruct": { "date": "2025-01-10" }
         },
-        "sponsorCollaboratorsModule": { "leadSponsor": { "name": "Example Bio" } },
+        "sponsorCollaboratorsModule": { "leadSponsor": { "name": "Example Bio", "class": "INDUSTRY" } },
         "conditionsModule": { "conditions": ["Ulcerative Colitis"] },
         "designModule": {
           "phases": ["PHASE1", "PHASE2"],
           "enrollmentInfo": { "count": 120 }
         },
         "armsInterventionsModule": {
-          "interventions": [{ "type": "DRUG", "name": "EX-101" }]
+          "interventions": [{ "type": "DRUG", "name": "EX-101", "otherNames": ["exampleumab"] }]
+        }
+      },
+      "derivedSection": {
+        "conditionBrowseModule": {
+          "meshes": [{ "id": "D003093", "term": "Colitis, Ulcerative" }],
+          "ancestors": [{ "id": "D015212", "term": "Inflammatory Bowel Diseases" }],
+          "browseBranches": [{ "abbrev": "BC06", "name": "Digestive System Diseases" }]
         }
       }
     },

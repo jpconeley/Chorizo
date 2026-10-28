@@ -4,7 +4,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from chorizo.ingest.ctgov import parse_date, parse_phase, parse_study, upsert_trials
+from chorizo.ingest.ctgov import is_drug_trial, parse_date, parse_phase, parse_study, upsert_trials
 from chorizo.models import Stage, Trial
 
 FIXTURE = Path(__file__).parent / "fixtures" / "ctgov_studies.json"
@@ -30,7 +30,11 @@ def test_parse_and_upsert_studies(session):
     assert first["nct_id"] == "NCT00000001"
     assert first["phase"] == Stage.PHASE2
     assert first["lead_sponsor"] == "Example Bio"
-    assert first["interventions"] == [{"type": "DRUG", "name": "EX-101"}]
+    assert first["interventions"] == [{"type": "DRUG", "name": "EX-101", "other_names": ["exampleumab"]}]
+    assert first["sponsor_class"] == "INDUSTRY"
+    assert "Colitis, Ulcerative" in first["condition_terms"]
+    assert is_drug_trial(first)
+    assert not is_drug_trial(records[1])  # no drug interventions listed
     assert first["start_date"] == date(2023, 5, 1)
 
     assert upsert_trials(session, records) == 2

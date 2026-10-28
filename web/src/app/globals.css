@@ -189,6 +189,13 @@ th.num {
   white-space: normal;
 }
 
+.pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+}
+
 /* Key/value */
 dl.kv {
   display: grid;

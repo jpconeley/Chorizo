@@ -37,16 +37,45 @@ who sees what, and a fast, dense UI sits on top.
 - **Analytics:** `stage_benchmarks` (versioned by source and `as_of`) and `pos_estimates`
   (versioned by `model_version`, with the inputs stored for auditability).
 
+## From trials to programs
+
+`backend/src/chorizo/ingest/programs.py` turns ClinicalTrials.gov trials into drug programs
+(one drug in one therapeutic area, the BIO/Biomedtracker convention):
+
+1. **Drugs per trial:** split combinations ("A + B"), drop placebos and comparators, strip doses
+   and formulations, and normalize names so "MK 3475" matches "MK-3475". A trial's "other names"
+   link aliases, so a code name and its generic name end up as one drug.
+2. **Therapeutic area** from the trial's MeSH condition terms (oncology, immunology, neurology...).
+3. **Program filter:** at least one industry-sponsored trial. Investigator-led studies of
+   marketed drugs would otherwise swamp the data.
+4. **Stage history:** the first trial start in each phase. A Phase 4 trial means the drug is
+   approved (filing is inferred at the same date).
+5. **Status:** discontinued when no trial is running and nothing has happened for three years;
+   otherwise active.
+
+Known limits, roughly in order of impact:
+
+- Approval is only detected through Phase 4 trials. Approved drugs without a registered Phase 4
+  trial look stalled at Phase 3, which pushes Phase 3 success down. Adding FDA approval data fixes
+  this.
+- Filing outcomes aren't on ClinicalTrials.gov, so the regulatory step always uses the published
+  BIO rate.
+- Name matching is heuristic; some aliases won't merge and a few unrelated names may.
+- Programs started recently are still undecided and don't count yet (right-censoring).
+
 ## Probability of success
 
 1. **Benchmarks.** For every program we count each stage it left by advancing (a success) and
    the last stage of every discontinued program (a failure). Programs still in progress don't
-   count yet. Rates are computed overall, by therapeutic area, and by area plus modality. The
-   published BIO/Biomedtracker 2006–2015 figures are loaded as a reference until our own history
-   is big enough.
+   count yet. A stage only counts as passed if a later stage started on or after it, so a new
+   Phase 2 study of an already-approved drug isn't scored as a Phase 2 success. Rates are computed
+   overall, by therapeutic area, and by area plus modality, from ClinicalTrials.gov programs only.
+   The published BIO/Biomedtracker 2006–2015 figures stay alongside as a reference and fill in
+   any rate we have too little data for.
 2. **Likelihood of approval** from a stage is the product of the remaining transition rates.
 3. **Per-asset estimate (model `v0-benchmark`).** For each remaining stage, use the most specific
-   benchmark with at least 30 programs behind it, and chain them together. Future models add
+   benchmark with at least 30 programs behind it, and chain them together. Discontinued programs
+   get no estimate. Future models add
    asset-level adjustments, such as biomarker selection, orphan status, sponsor track record and
    trial design, and bump the version. Old estimates are kept for back-testing.
 
@@ -65,8 +94,8 @@ an upgrade prompt.
 
 ## Roadmap
 
-1. **Analytics terminal:** bulk ClinicalTrials.gov import, matching trials to assets, more
-   sources (FDA approvals, SEC filings), alerts on stage changes.
+1. **Analytics terminal:** FDA approval data to confirm approvals, better drug-name matching,
+   more sources (SEC filings), alerts on stage changes.
 2. **Owner listings:** organization verification, listing editor, data-room uploads, interest
    analytics for sponsors.
 3. **Funding:** transactions through a registered funding portal or broker-dealer partner

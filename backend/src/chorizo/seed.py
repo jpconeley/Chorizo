@@ -92,6 +92,7 @@ def seed_demo(session: Session) -> None:
             indication=indication,
             stage=stage,
             status=AssetStatus.ACTIVE,
+            source="demo",
             summary=f"Demo {modality.value.replace('_', ' ')} targeting {target} for {indication.lower()}.",
         )
         session.add(asset)

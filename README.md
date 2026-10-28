@@ -46,10 +46,16 @@ They all use the password `chorizo-demo-pass`, and each holds the plan in its na
 
 ## Data jobs
 
+Load real data from ClinicalTrials.gov: import every phased drug trial, group them into drug
+programs, then compute success rates and per-drug estimates. With the Docker setup:
+
 ```bash
-make ingest QUERY="ulcerative colitis"   # import trials from ClinicalTrials.gov
-make benchmarks                           # recompute stage benchmarks and per-asset estimates
+docker compose exec api chorizo refresh-data --max-pages 5   # quick test: first 5,000 studies
+docker compose exec api chorizo refresh-data                 # full import, roughly 30–60 minutes
 ```
+
+Without Docker, run `uv run chorizo refresh-data` in `backend/`. The steps also run separately:
+`ingest-ctgov`, `build-programs`, `compute-benchmarks` and `refresh-estimates`.
 
 ## Tests
 

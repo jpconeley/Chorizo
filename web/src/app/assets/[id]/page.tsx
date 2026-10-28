@@ -62,7 +62,16 @@ async function AssetPageContent(props: PageProps<"/assets/[id]">) {
             {a.summary && <p style={{ marginTop: 10 }}>{a.summary}</p>}
           </Panel>
 
-          <Panel title="Clinical trials" right={<span className="muted">{a.trials.length}</span>}>
+          <Panel
+            title="Clinical trials"
+            right={
+              <span className="muted">
+                {a.trial_count > a.trials.length
+                  ? `${a.trials.length} most recent of ${a.trial_count.toLocaleString()}`
+                  : a.trial_count}
+              </span>
+            }
+          >
             {a.trials.length === 0 ? (
               <p className="muted">No linked trials yet.</p>
             ) : (
@@ -116,7 +125,11 @@ async function AssetPageContent(props: PageProps<"/assets/[id]">) {
 
         <div>
           <Panel title="Probability of success">
-            {pos.ok ? (
+            {a.status === "discontinued" ? (
+              <p className="muted">
+                Development discontinued: no trial activity in the last three years.
+              </p>
+            ) : pos.ok ? (
               <>
                 <div className="stats">
                   <div className="stat">

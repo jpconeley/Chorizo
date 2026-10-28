@@ -4,7 +4,19 @@ import Link from "next/link";
 import { ApiDown, Bar, Loading, Panel, StageBadge } from "@/components/ui";
 import { api } from "@/lib/api";
 import { label, pct } from "@/lib/format";
-import { MODALITIES, STAGE_LABEL, STAGES, type AssetPage, type Benchmark } from "@/lib/types";
+import { AREAS, MODALITIES, STAGE_LABEL, STAGES, type AssetPage, type Benchmark } from "@/lib/types";
+
+const PAGE_SIZE = 50;
+
+/** One row per stage: our computed rate when we have one, else the published reference. */
+function preferredRates(rows: Benchmark[]): Benchmark[] {
+  const byStage = new Map<string, Benchmark>();
+  for (const b of rows) {
+    const current = byStage.get(b.stage);
+    if (!current || (current.source.startsWith("BIO") && !b.source.startsWith("BIO"))) byStage.set(b.stage, b);
+  }
+  return STAGES.flatMap((s) => byStage.get(s) ?? []);
+}
 
 async function ScreenerContent(props: PageProps<"/">) {
   const params = await props.searchParams;
@@ -13,9 +25,15 @@ async function ScreenerContent(props: PageProps<"/">) {
     const value = params[key];
     if (typeof value === "string" && value) query.set(key, value);
   }
+  const offset = Math.max(0, Number(params.offset) || 0);
+  const pageLink = (to: number) => {
+    const next = new URLSearchParams(query);
+    if (to > 0) next.set("offset", String(to));
+    return `/?${next}`;
+  };
 
   const [assets, benchmarks] = await Promise.all([
-    api<AssetPage>(`/assets?${query}`),
+    api<AssetPage>(`/assets?${query}&limit=${PAGE_SIZE}&offset=${offset}`),
     api<Benchmark[]>("/benchmarks"),
   ]);
   if (!assets.ok) return <ApiDown />;
@@ -23,7 +41,7 @@ async function ScreenerContent(props: PageProps<"/">) {
   return (
     <div className="grid">
       <div>
-        <Panel title="Asset screener" right={<span className="muted">{assets.data.total} assets</span>}>
+        <Panel title="Asset screener" right={<span className="muted">{assets.data.total.toLocaleString()} assets</span>}>
           <form className="filters">
             <input
               className="command"
@@ -36,6 +54,14 @@ async function ScreenerContent(props: PageProps<"/">) {
               {STAGES.map((s) => (
                 <option key={s} value={s}>
                   {STAGE_LABEL[s]}
+                </option>
+              ))}
+            </select>
+            <select name="therapeutic_area" defaultValue={query.get("therapeutic_area") ?? ""}>
+              <option value="">All areas</option>
+              {AREAS.map((a) => (
+                <option key={a} value={a}>
+                  {label(a)}
                 </option>
               ))}
             </select>
@@ -56,7 +82,7 @@ async function ScreenerContent(props: PageProps<"/">) {
                   <th>Asset</th>
                   <th>Stage</th>
                   <th>Modality</th>
-                  <th>Target</th>
+                  <th>Status</th>
                   <th>Indication</th>
                   <th>Area</th>
                   <th>Owner</th>
@@ -72,7 +98,7 @@ async function ScreenerContent(props: PageProps<"/">) {
                       <StageBadge stage={a.stage} />
                     </td>
                     <td>{label(a.modality)}</td>
-                    <td>{a.target ?? "—"}</td>
+                    <td className={a.status === "discontinued" ? "down" : "muted"}>{label(a.status)}</td>
                     <td>{a.indication}</td>
                     <td>{label(a.therapeutic_area)}</td>
                     <td className="muted">{a.organization?.name ?? "—"}</td>
@@ -88,6 +114,16 @@ async function ScreenerContent(props: PageProps<"/">) {
               </tbody>
             </table>
           </div>
+          {assets.data.total > PAGE_SIZE && (
+            <div className="pager">
+              {offset > 0 ? <Link href={pageLink(Math.max(0, offset - PAGE_SIZE))}>← Prev</Link> : <span />}
+              <span className="muted">
+                {(offset + 1).toLocaleString()}–{Math.min(offset + PAGE_SIZE, assets.data.total).toLocaleString()} of{" "}
+                {assets.data.total.toLocaleString()}
+              </span>
+              {offset + PAGE_SIZE < assets.data.total ? <Link href={pageLink(offset + PAGE_SIZE)}>Next →</Link> : <span />}
+            </div>
+          )}
         </Panel>
       </div>
       <div>
@@ -102,9 +138,12 @@ async function ScreenerContent(props: PageProps<"/">) {
                 </tr>
               </thead>
               <tbody>
-                {benchmarks.data.map((b) => (
+                {preferredRates(benchmarks.data).map((b) => (
                   <tr key={`${b.source}-${b.stage}`}>
-                    <td>{STAGE_LABEL[b.stage]}</td>
+                    <td title={`${b.source}, n=${b.sample_size.toLocaleString()}`}>
+                      {STAGE_LABEL[b.stage]}
+                      {b.source.startsWith("BIO") && <span className="muted"> *</span>}
+                    </td>
                     <td className="num">{pct(b.transition_probability)}</td>
                     <td className="num">
                       <Bar value={b.likelihood_of_approval} />
@@ -118,7 +157,8 @@ async function ScreenerContent(props: PageProps<"/">) {
             <p className="muted">No benchmarks loaded.</p>
           )}
           <p className="disclaimer">
-            All therapeutic areas. <Link href="/benchmarks">Full benchmarks →</Link>
+            All therapeutic areas, from ClinicalTrials.gov programs. * Published BIO 2006–2015 figure
+            where we lack data. <Link href="/benchmarks">Full benchmarks →</Link>
           </p>
         </Panel>
       </div>

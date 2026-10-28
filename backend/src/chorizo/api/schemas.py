@@ -85,7 +85,8 @@ class AssetDetail(AssetSummary):
     orphan_designation: bool
     summary: str | None
     stage_history: list[StageEventOut]
-    trials: list[TrialOut]
+    trials: list[TrialOut]  # most recent first, capped
+    trial_count: int
     open_listing_ids: list[int]
 
 

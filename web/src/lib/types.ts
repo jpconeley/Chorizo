@@ -27,6 +27,24 @@ export const STAGE_LABEL: Record<Stage, string> = {
   approved: "Approved",
 };
 
+// Matches THERAPEUTIC_AREAS in backend/src/chorizo/ingest/programs.py.
+export const AREAS = [
+  "oncology",
+  "infectious_disease",
+  "cardiovascular",
+  "metabolic",
+  "psychiatry",
+  "neurology",
+  "immunology",
+  "respiratory",
+  "hematology",
+  "gastroenterology",
+  "ophthalmology",
+  "dermatology",
+  "renal",
+  "other",
+] as const;
+
 export const MODALITIES = [
   "small_molecule",
   "antibody",
@@ -68,6 +86,7 @@ export type AssetDetail = AssetSummary & {
     start_date: string | null;
     completion_date: string | null;
   }[];
+  trial_count: number;
   open_listing_ids: number[];
 };
 

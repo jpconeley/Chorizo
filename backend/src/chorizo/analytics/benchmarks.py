@@ -5,6 +5,10 @@ active. Each stage a program left by entering a later stage counts as a
 success. The last stage of a discontinued program counts as a failure. The
 last stage of an active program is still undecided, so it is left out.
 
+When stage entry dates are known, only a later stage entered on or after a stage
+counts as advancing from it. That keeps a new Phase 2 trial of an already-approved
+drug from being scored as a Phase 2 success.
+
 The likelihood of approval (LOA) from a stage is the product of the transition
 probabilities from that stage through regulatory review, the standard method
 used in the BIO/Biomedtracker studies.
@@ -13,6 +17,7 @@ used in the BIO/Biomedtracker studies.
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date
 
 from chorizo.models import STAGE_ORDER, AssetStatus, Modality, Stage
 
@@ -26,6 +31,7 @@ class ProgramHistory:
     status: AssetStatus
     therapeutic_area: str | None = None
     modality: Modality | None = None
+    entered: dict[Stage, date] | None = None  # first entry date per stage, if known
 
 
 @dataclass(frozen=True)
@@ -50,11 +56,30 @@ class Transition:
 
 def outcomes(program: ProgramHistory) -> list[tuple[Stage, bool]]:
     """(stage, advanced?) for each stage of this program whose outcome is known."""
+    if program.entered:
+        return _dated_outcomes(program.entered, program.status)
     reached = sorted(set(program.stages), key=STAGE_ORDER.index)
     result = [(stage, True) for stage in reached[:-1]]
     last = reached[-1] if reached else None
     if last is not None and last != Stage.APPROVED and program.status == AssetStatus.DISCONTINUED:
         result.append((last, False))
+    return result
+
+
+def _dated_outcomes(entered: dict[Stage, date], status: AssetStatus) -> list[tuple[Stage, bool]]:
+    top = max(entered, key=STAGE_ORDER.index)
+    result = []
+    for stage in sorted(entered, key=STAGE_ORDER.index):
+        if stage == Stage.APPROVED:
+            continue
+        advanced = any(
+            STAGE_ORDER.index(later) > STAGE_ORDER.index(stage) and on >= entered[stage]
+            for later, on in entered.items()
+        )
+        if advanced:
+            result.append((stage, True))
+        elif stage == top and status == AssetStatus.DISCONTINUED:
+            result.append((stage, False))
     return result
 
 

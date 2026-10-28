@@ -4,11 +4,9 @@ import type { Metadata } from "next";
 import { ApiDown, Bar, Loading, Locked, Panel } from "@/components/ui";
 import { api } from "@/lib/api";
 import { label, pct } from "@/lib/format";
-import { MODALITIES, STAGE_LABEL, type Benchmark } from "@/lib/types";
+import { AREAS, MODALITIES, STAGE_LABEL, type Benchmark } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Benchmarks" };
-
-const AREAS = ["oncology", "immunology", "neurology", "cardiovascular", "metabolic", "infectious_disease", "rare_disease"];
 
 async function BenchmarksContent(props: PageProps<"/benchmarks">) {
   const params = await props.searchParams;

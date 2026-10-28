@@ -1,4 +1,4 @@
-.PHONY: setup db migrate seed api web test lint ingest benchmarks
+.PHONY: setup db migrate seed api web test lint data benchmarks
 
 setup:  ## Install backend and web dependencies
 	cd backend && uv sync
@@ -23,8 +23,8 @@ test:  ## Run all tests and checks
 	cd backend && uv run ruff check . && uv run pytest -q
 	cd web && pnpm lint && pnpm build
 
-ingest:  ## Import trials from ClinicalTrials.gov (QUERY="..." to filter)
-	cd backend && uv run chorizo ingest-ctgov $(if $(QUERY),--query "$(QUERY)")
+data:  ## Import ClinicalTrials.gov, build programs, recompute benchmarks and estimates
+	cd backend && uv run chorizo refresh-data $(if $(PAGES),--max-pages $(PAGES))
 
-benchmarks:  ## Recompute benchmarks and per-asset estimates
-	cd backend && uv run chorizo compute-benchmarks && uv run chorizo refresh-estimates
+benchmarks:  ## Rebuild programs, benchmarks and estimates from already-imported trials
+	cd backend && uv run chorizo build-programs && uv run chorizo compute-benchmarks && uv run chorizo refresh-estimates

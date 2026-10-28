@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -74,6 +75,14 @@ def export_assets(
     )
 
 
+MAX_TRIALS = 100
+
+
+def _recent(links: list[AssetTrial]):
+    trials = [link.trial for link in links]
+    return sorted(trials, key=lambda t: t.start_date or date.min, reverse=True)[:MAX_TRIALS]
+
+
 @router.get("/{asset_id}", response_model=AssetDetail)
 def get_asset(asset_id: int, session: SessionDep):
     asset = session.get(
@@ -96,7 +105,8 @@ def get_asset(asset_id: int, session: SessionDep):
         orphan_designation=asset.orphan_designation,
         summary=asset.summary,
         stage_history=asset.stage_history,
-        trials=[TrialOut.model_validate(link.trial) for link in asset.trials],
+        trials=[TrialOut.model_validate(t) for t in _recent(asset.trials)],
+        trial_count=len(asset.trials),
         open_listing_ids=[lst.id for lst in asset.listings if lst.status == ListingStatus.OPEN],
     )
 
