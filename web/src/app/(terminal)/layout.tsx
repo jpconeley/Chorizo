@@ -2,6 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
+import { CommandBar } from "@/components/CommandBar";
+import { Clock } from "@/components/live";
+import { Ticker } from "@/components/Ticker";
 import { Logo } from "@/components/ui";
 import { logout } from "@/lib/actions";
 import { getMe } from "@/lib/api";
@@ -18,8 +21,9 @@ async function UserMenu() {
   if (!me) redirect("/exit"); // session expired or no longer valid
   return (
     <>
-      <Link href="/account">
-        {me.email} · {me.plans.length ? me.plans.join("+").toUpperCase() : "FREE"}
+      <Link href="/account" className="who" title={me.email}>
+        <span className="who-email">{me.email}</span>
+        <span className="who-plan">{me.plans.length ? me.plans.join("+").toUpperCase() : "FREE"}</span>
       </Link>
       <form action={logout}>
         <button className="ghost">LOGOUT</button>
@@ -45,15 +49,21 @@ export default function TerminalLayout({ children }: LayoutProps<"/">) {
             </Link>
           ))}
         </nav>
+        <CommandBar />
         <span className="spacer" />
         <Suspense>
           <UserMenu />
         </Suspense>
       </header>
+      <Suspense>
+        <Ticker />
+      </Suspense>
       <main>{children}</main>
       <footer className="statusbar">
         <span className="live">DATA: ClinicalTrials.gov · Drugs@FDA · BIO/Biomedtracker 2006–2015</span>
         <span>Not investment advice. Estimates are historical base rates, not predictions.</span>
+        <span className="spacer" />
+        <Clock />
       </footer>
     </>
   );

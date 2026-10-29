@@ -135,3 +135,17 @@ export type PlanInfo = {
   per_seat: boolean;
   features: string[];
 };
+
+export type MarketStats = {
+  programs: number;
+  active: number;
+  approved: number;
+  trials: number;
+  phase3_starts_12m: number;
+  pipeline: { stage: Stage; count: number }[];
+  approvals_by_year: { year: number; count: number }[];
+};
+
+export type FeedEvent = { asset_id: number; asset: string; stage: Stage; on: string; sponsor: string | null };
+
+export type SearchHit = { id: number; name: string; stage: Stage; indication: string; sponsor: string | null };

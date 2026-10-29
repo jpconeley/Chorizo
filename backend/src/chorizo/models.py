@@ -205,7 +205,7 @@ class StageEvent(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), index=True)
     stage: Mapped[Stage] = mapped_column(_enum(Stage))
-    entered_on: Mapped[date] = mapped_column(Date)
+    entered_on: Mapped[date] = mapped_column(Date, index=True)
     source: Mapped[str] = mapped_column(String(64))  # e.g. "ctgov", "owner", "filing"
 
     asset: Mapped[Asset] = relationship(back_populates="stage_history")

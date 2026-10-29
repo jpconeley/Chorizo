@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from chorizo.api.routes import assets, auth, benchmarks, billing, listings, watchlist
+from chorizo.api.routes import assets, auth, benchmarks, billing, listings, market, watchlist
 from chorizo.config import get_settings
 
 
@@ -14,7 +14,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    for module in (auth, assets, benchmarks, listings, watchlist, billing):
+    for module in (auth, assets, benchmarks, listings, market, watchlist, billing):
         app.include_router(module.router, prefix="/v1")
 
     @app.get("/health", tags=["ops"])

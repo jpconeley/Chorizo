@@ -4,13 +4,13 @@ from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import selectinload
 
 from chorizo.analytics.service import latest_estimate
 from chorizo.api.deps import Features, SessionDep, require
 from chorizo.api.schemas import AssetDetail, AssetPage, AssetSummary, PosOut, TrialOut
-from chorizo.models import Asset, AssetTrial, ListingStatus, Modality, Stage
+from chorizo.models import Asset, AssetTrial, ListingStatus, Modality, Organization, Stage
 from chorizo.plans import Feature
 
 router = APIRouter(prefix="/assets", tags=["assets"])
@@ -27,9 +27,21 @@ def _filtered(stage, therapeutic_area, modality, q):
     if q:
         pattern = f"%{q}%"
         query = query.where(
-            or_(Asset.name.ilike(pattern), Asset.indication.ilike(pattern), Asset.target.ilike(pattern))
+            or_(
+                Asset.name.ilike(pattern),
+                Asset.indication.ilike(pattern),
+                Asset.target.ilike(pattern),
+                Asset.organization.has(Organization.name.ilike(pattern)),
+            )
         )
     return query
+
+
+def _ordering(q: str | None):
+    """Names starting with the search text first, then alphabetical."""
+    if not q:
+        return (Asset.name,)
+    return (case((Asset.name.ilike(f"{q}%"), 0), else_=1), Asset.name)
 
 
 @router.get("", response_model=AssetPage)
@@ -45,7 +57,7 @@ def list_assets(
     query = _filtered(stage, therapeutic_area, modality, q)
     total = session.scalar(select(func.count()).select_from(query.subquery())) or 0
     rows = session.scalars(
-        query.options(selectinload(Asset.organization)).order_by(Asset.name).limit(limit).offset(offset)
+        query.options(selectinload(Asset.organization)).order_by(*_ordering(q)).limit(limit).offset(offset)
     ).all()
     return AssetPage(
         items=[AssetSummary.model_validate(a) for a in rows], total=total, limit=limit, offset=offset

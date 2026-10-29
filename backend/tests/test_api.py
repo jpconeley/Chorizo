@@ -124,3 +124,24 @@ def test_subscription_webhook_grants_and_revokes_access(client, seeded, login):
     event["data"]["object"]["status"] = "canceled"
     assert apply_subscription_event(seeded, event)
     assert "asset_pos" not in client.get("/v1/me", headers=headers).json()["features"]
+
+
+def test_market_stats_and_feed(client):
+    stats = client.get("/v1/market/stats", params={"years": 10}).json()
+    assert stats["programs"] == 6 and stats["active"] == 6
+    pipeline = {row["stage"]: row["count"] for row in stats["pipeline"]}
+    assert pipeline["phase2"] == 2 and pipeline["regulatory"] == 1
+    assert len(stats["approvals_by_year"]) == 10
+
+    feed = client.get("/v1/market/feed", params={"limit": 5}).json()
+    assert len(feed) == 5
+    assert feed == sorted(feed, key=lambda e: e["on"], reverse=True)
+    assert all(e["stage"] != "regulatory" for e in feed)
+    assert feed[0]["sponsor"] == "Demo Therapeutics"
+
+
+def test_search_matches_sponsor_and_ranks_prefix_first(client):
+    by_sponsor = client.get("/v1/assets", params={"q": "demo thera"}).json()
+    assert by_sponsor["total"] == 6
+    ranked = client.get("/v1/assets", params={"q": "DEMO-2"}).json()["items"]
+    assert ranked[0]["name"] == "DEMO-204"
