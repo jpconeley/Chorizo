@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -7,9 +6,6 @@ import { Logo } from "@/components/ui";
 import { getMe } from "@/lib/api";
 import { logout } from "@/lib/actions";
 import "./globals.css";
-
-const mono = IBM_Plex_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400", "600", "700"] });
-const sans = IBM_Plex_Sans({ variable: "--font-sans", subsets: ["latin"], weight: ["400", "600"] });
 
 export const metadata: Metadata = {
   title: { default: "Chorizo", template: "%s · Chorizo" },
@@ -40,7 +36,7 @@ async function UserMenu() {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${mono.variable} ${sans.variable}`}>
+    <html lang="en">
       <body>
         <header className="topbar">
           <Link href="/" className="brand">

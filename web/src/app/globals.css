@@ -29,8 +29,10 @@
   --stage-regulatory: #9be15d;
   --stage-approved: #3ee08f;
 
-  --mono: var(--font-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --sans: var(--font-sans), system-ui, sans-serif;
+  /* Segoe UI ships with Windows; other systems fall back to their own UI font. */
+  --sans: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --mono: "Cascadia Mono", Consolas, ui-monospace, "SFMono-Regular", Menlo, monospace;
   color-scheme: dark;
 }
 
@@ -44,8 +46,9 @@ html,
 body {
   background-color: var(--bg);
   color: var(--text);
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 13px;
+  font-variant-numeric: tabular-nums; /* figures line up in columns, terminal-style */
   line-height: 1.45;
 }
 body {
@@ -63,6 +66,10 @@ a {
 }
 a:hover {
   text-decoration: underline;
+}
+
+code {
+  font-family: var(--mono);
 }
 
 /* Shell */
