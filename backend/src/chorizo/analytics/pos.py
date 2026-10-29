@@ -21,6 +21,9 @@ class BenchmarkPoint:
     probability: float
     sample_size: int
     source: str
+    # True when this rate already runs through approval (our Phase 3 rate, since
+    # filings aren't visible): the chain stops here instead of adding the filing step.
+    through_approval: bool = False
 
 
 BenchmarkTable = dict[tuple[Stage, GroupKey], BenchmarkPoint]
@@ -68,5 +71,8 @@ def estimate(
             "source": point.source,
             "therapeutic_area": key.therapeutic_area,
             "modality": key.modality.value if key.modality else None,
+            "through_approval": point.through_approval,
         }
+        if point.through_approval:
+            break
     return result

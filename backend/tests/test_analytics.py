@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 
 from chorizo.analytics import pos
@@ -65,3 +67,24 @@ def test_pos_prefers_specific_benchmark_with_enough_data():
 def test_pos_unknown_when_benchmarks_missing():
     est = pos.estimate({}, Stage.PRECLINICAL, None, None)
     assert est.next_stage_probability is None and est.likelihood_of_approval is None
+
+
+def test_phase3_outcome_needs_phase2_first():
+    jumped = ProgramHistory(
+        [], AssetStatus.DISCONTINUED, entered={Stage.PHASE1: date(2010, 1, 1), Stage.PHASE3: date(2012, 1, 1)}
+    )
+    assert outcomes(jumped) == [(Stage.PHASE1, True)]
+    full = ProgramHistory(
+        [], AssetStatus.DISCONTINUED, entered={Stage.PHASE2: date(2010, 1, 1), Stage.PHASE3: date(2012, 1, 1)}
+    )
+    assert outcomes(full) == [(Stage.PHASE2, True), (Stage.PHASE3, False)]
+
+
+def test_through_approval_rate_ends_the_chain():
+    table = {
+        (Stage.PHASE3, GroupKey()): pos.BenchmarkPoint(0.5, 500, "ours", through_approval=True),
+        (Stage.REGULATORY, GroupKey()): pos.BenchmarkPoint(0.8, 500, "ref"),
+    }
+    est = pos.estimate(table, Stage.PHASE3, None, None)
+    assert est.likelihood_of_approval == pytest.approx(0.5)
+    assert "regulatory" not in est.inputs

@@ -75,8 +75,10 @@ Known limits, roughly in order of impact:
   Europe, Japan or China look like failures.
 - Benchmarks cover drugs and therapeutic biologics, not vaccines, cell and gene therapies or
   blood products.
-- Filing outcomes aren't on ClinicalTrials.gov, so the regulatory step always uses the published
-  BIO rate.
+- Filings aren't on ClinicalTrials.gov, so our Phase 3 rate runs all the way to approval. Compare
+  it with BIO's Phase 3 × filing rate (49.6% for 2006–2015), not their Phase 3 → filing 58.1%.
+- A Phase 3 outcome only counts if the program had a Phase 2 trial first. Programs that start at
+  Phase 3 are nearly always biosimilars, new forms of old drugs or repackaged products.
 - Name matching is heuristic; some aliases won't merge and a few unrelated names may.
 - Programs started recently are still undecided and don't count yet (right-censoring).
 - New indications of already-approved drugs aren't benchmarked, so rates describe new drugs.

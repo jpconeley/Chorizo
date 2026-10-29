@@ -7,7 +7,10 @@ last stage of an active program is still undecided, so it is left out.
 
 When stage entry dates are known, only a later stage entered on or after a stage
 counts as advancing from it. That keeps a new Phase 2 trial of an already-approved
-drug from being scored as a Phase 2 success.
+drug from being scored as a Phase 2 success. A Phase 3 outcome also needs a Phase 2
+entry before it: US law has required Phase 2 and 3 trials to be registered since
+2007, so a "program" that starts at Phase 3 is nearly always a biosimilar, a new form
+of an old drug or a repackaged product, not a new drug's development.
 
 The likelihood of approval (LOA) from a stage is the product of the transition
 probabilities from that stage through regulatory review, the standard method
@@ -66,11 +69,18 @@ def outcomes(program: ProgramHistory) -> list[tuple[Stage, bool]]:
     return result
 
 
+# A stage's outcome only counts if this earlier stage was entered first (see above).
+REQUIRES_EARLIER = {Stage.PHASE3: Stage.PHASE2}
+
+
 def _dated_outcomes(entered: dict[Stage, date], status: AssetStatus) -> list[tuple[Stage, bool]]:
     top = max(entered, key=STAGE_ORDER.index)
     result = []
     for stage in sorted(entered, key=STAGE_ORDER.index):
         if stage == Stage.APPROVED:
+            continue
+        earlier = REQUIRES_EARLIER.get(stage)
+        if earlier and not (earlier in entered and entered[earlier] <= entered[stage]):
             continue
         advanced = any(
             STAGE_ORDER.index(later) > STAGE_ORDER.index(stage) and on >= entered[stage]

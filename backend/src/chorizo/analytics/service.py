@@ -14,12 +14,12 @@ from chorizo.analytics.benchmarks import (
 )
 from chorizo.ingest.programs import SOURCE as CTGOV_SOURCE
 from chorizo.models import Asset, AssetStatus, PosEstimate, Stage, StageBenchmark, StageEvent
-from chorizo.seed import BIO_2016_SOURCE
 
 COMPUTED_SOURCE = "ClinicalTrials.gov (Chorizo)"
 GROUPINGS: list[tuple[str, ...]] = [(), ("therapeutic_area",), ("therapeutic_area", "modality")]
-# Filing outcomes aren't visible on ClinicalTrials.gov, so the regulatory step always
-# comes from the published reference figures.
+# Filings aren't visible on ClinicalTrials.gov, so our Phase 3 "success" is reaching
+# approval: the computed Phase 3 rate already includes the regulatory step, and no
+# separate regulatory rate is computed.
 UNOBSERVED_STAGES = {Stage.REGULATORY}
 
 
@@ -44,9 +44,15 @@ def benchmark_table(session: Session) -> pos.BenchmarkTable:
     table: pos.BenchmarkTable = {}
     for row in sorted(latest_benchmarks(session), key=lambda r: r.source == COMPUTED_SOURCE):
         key = (row.stage, GroupKey(row.therapeutic_area, row.modality))
-        if row.source == COMPUTED_SOURCE and key in table and row.sample_size < pos.MIN_SAMPLE_SIZE:
+        computed = row.source == COMPUTED_SOURCE
+        if computed and key in table and row.sample_size < pos.MIN_SAMPLE_SIZE:
             continue
-        table[key] = pos.BenchmarkPoint(row.transition_probability, row.sample_size, row.source)
+        table[key] = pos.BenchmarkPoint(
+            row.transition_probability,
+            row.sample_size,
+            row.source,
+            through_approval=computed and row.stage == Stage.PHASE3,
+        )
     return table
 
 
@@ -86,18 +92,13 @@ def recompute_benchmarks(session: Session, as_of: date | None = None) -> int:
     """Replace our computed benchmarks with fresh ones from the imported programs."""
     as_of = as_of or date.today()
     programs = _program_histories(session)
-    reference = {
-        r.stage: r.transition_probability
-        for r in latest_benchmarks(session, BIO_2016_SOURCE)
-        if r.therapeutic_area is None and r.modality is None
-    }
     session.execute(delete(StageBenchmark).where(StageBenchmark.source == COMPUTED_SOURCE))
     rows = []
     for group_by in GROUPINGS:
         for key, by_stage in compute_transitions(programs, group_by).items():
             probabilities = {stage: t.probability for stage, t in by_stage.items()}
-            # Complete the approval chain with the published rate for stages we can't observe.
-            probabilities.update({s: reference.get(s) for s in UNOBSERVED_STAGES})
+            # Our Phase 3 rate runs through approval, so the filing step adds nothing.
+            probabilities.update({s: 1.0 for s in UNOBSERVED_STAGES})
             for stage, transition in by_stage.items():
                 if transition.probability is None or stage in UNOBSERVED_STAGES:
                     continue

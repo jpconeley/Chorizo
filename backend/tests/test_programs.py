@@ -56,11 +56,8 @@ def test_dated_outcomes_ignore_stages_entered_after_approval():
             Stage.PHASE2: date(2020, 1, 1),  # new indication study after approval
         },
     )
-    assert outcomes(history) == [
-        (Stage.PHASE1, True),
-        (Stage.PHASE3, True),
-        (Stage.REGULATORY, True),
-    ]
+    # Phase 3 isn't counted either: it had no Phase 2 before it.
+    assert outcomes(history) == [(Stage.PHASE1, True), (Stage.REGULATORY, True)]
 
 
 def _trial(nct, phase, drug, *, status="COMPLETED", start="2015-01-01", sponsor_class="INDUSTRY", others=(),
@@ -267,13 +264,14 @@ def test_benchmarks_and_estimates_from_programs(imported):
         )
     }
     # Phase 1: EX-1, EX-2, EX-3 and EX-5 advanced; midazolam isn't counted.
-    # Phase 2: EX-1 advanced, EX-2 failed; EX-3 undecided. Phase 3: EX-1 and EX-5 approved.
+    # Phase 2: EX-1 advanced, EX-2 failed; EX-3 undecided.
+    # Phase 3: EX-1 approved. EX-5 jumped from Phase 1 to 3, so its Phase 3 isn't counted.
     assert (rows[Stage.PHASE1].transition_probability, rows[Stage.PHASE1].sample_size) == (1.0, 4)
     assert (rows[Stage.PHASE2].transition_probability, rows[Stage.PHASE2].sample_size) == (0.5, 2)
-    assert (rows[Stage.PHASE3].transition_probability, rows[Stage.PHASE3].sample_size) == (1.0, 2)
+    assert (rows[Stage.PHASE3].transition_probability, rows[Stage.PHASE3].sample_size) == (1.0, 1)
     assert Stage.REGULATORY not in rows  # never computed from ClinicalTrials.gov
-    # The approval chain is completed with the published regulatory rate.
-    assert rows[Stage.PHASE3].likelihood_of_approval == pytest.approx(0.853)
+    # Our Phase 3 rate already runs through approval; no filing step is added on top.
+    assert rows[Stage.PHASE3].likelihood_of_approval == pytest.approx(1.0)
 
     # Tiny samples never override the published reference figures.
     assert service.refresh_estimates(imported) > 0

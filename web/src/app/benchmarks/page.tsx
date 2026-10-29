@@ -70,7 +70,10 @@ async function BenchmarksContent(props: PageProps<"/benchmarks">) {
               <tbody>
                 {rows.map((b) => (
                   <tr key={b.stage}>
-                    <td>{STAGE_LABEL[b.stage]}</td>
+                    <td>
+                      {STAGE_LABEL[b.stage]}
+                      {b.stage === "phase3" && !source.startsWith("BIO") && " → approval"}
+                    </td>
                     <td className="num">{pct(b.transition_probability)}</td>
                     <td>
                       <Bar value={b.transition_probability} />
@@ -85,6 +88,12 @@ async function BenchmarksContent(props: PageProps<"/benchmarks">) {
               </tbody>
             </table>
           </div>
+          {!source.startsWith("BIO") && (
+            <p className="disclaimer">
+              Filings aren&apos;t recorded on ClinicalTrials.gov, so Phase 3 here runs all the way to FDA
+              approval. Compare it with the published Phase 3 × Filed rate.
+            </p>
+          )}
         </Panel>
       ))}
       <p className="disclaimer">

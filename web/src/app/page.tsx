@@ -15,8 +15,13 @@ function preferredRates(rows: Benchmark[]): Benchmark[] {
     const current = byStage.get(b.stage);
     if (!current || (current.source.startsWith("BIO") && !b.source.startsWith("BIO"))) byStage.set(b.stage, b);
   }
+  // Our Phase 3 rate runs through approval (filings aren't on ClinicalTrials.gov), so the
+  // separate filing step only applies to the published figures.
+  if (!byStage.get("phase3")?.source.startsWith("BIO")) byStage.delete("regulatory");
   return STAGES.flatMap((s) => byStage.get(s) ?? []);
 }
+
+const throughApproval = (b: Benchmark) => b.stage === "phase3" && !b.source.startsWith("BIO");
 
 async function ScreenerContent(props: PageProps<"/">) {
   const params = await props.searchParams;
@@ -142,6 +147,7 @@ async function ScreenerContent(props: PageProps<"/">) {
                   <tr key={`${b.source}-${b.stage}`}>
                     <td title={`${b.source}, n=${b.sample_size.toLocaleString()}`}>
                       {STAGE_LABEL[b.stage]}
+                      {throughApproval(b) && " → approval"}
                       {b.source.startsWith("BIO") && <span className="muted"> *</span>}
                     </td>
                     <td className="num">{pct(b.transition_probability)}</td>

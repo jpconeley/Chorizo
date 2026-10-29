@@ -10,6 +10,7 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from chorizo.analytics.benchmarks import REQUIRES_EARLIER
 from chorizo.ingest.programs import SOURCE, name_candidates
 from chorizo.models import (
     STAGE_ORDER,
@@ -83,6 +84,14 @@ def report(session: Session) -> str:
 
     for stage in CLINICAL:
         failed = [r for r in eligible if r.stage == stage and r.status == AssetStatus.DISCONTINUED]
+        earlier = REQUIRES_EARLIER.get(stage)
+        if earlier:  # match the benchmark rule: only count stages entered after `earlier`
+            failed = [
+                r
+                for r in failed
+                if (r.id, earlier) in first_entry
+                and first_entry[(r.id, earlier)] <= first_entry[(r.id, stage)]
+            ]
         n = len(failed)
         elsewhere = sum(furthest[drug_of[r.id]] > STAGE_ORDER.index(stage) for r in failed)
         names = lambda r: [r.name, *(r.synonyms or [])]  # noqa: E731
