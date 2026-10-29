@@ -1,6 +1,6 @@
 # Architecture
 
-Chorizo is built like a market-data terminal. A data layer collects and normalizes facts about
+LASO is built like a market-data terminal. A data layer collects and normalizes facts about
 drug programs. An analytics layer turns them into probabilities. An entitlement layer decides
 who sees what, and a fast, dense UI sits on top.
 

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Chorizo", template: "%s · Chorizo" },
+  title: { default: "LASO", template: "%s · LASO" },
   description: "Biotech asset marketplace and drug-development analytics.",
 };
 

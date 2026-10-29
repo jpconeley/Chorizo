@@ -1,4 +1,4 @@
-# Chorizo
+# LASO
 
 A marketplace and analytics terminal for biotech assets. Owners list therapies at any stage of
 development and ask for funding. Investors, both institutional and retail, screen assets, see how
@@ -6,6 +6,9 @@ often comparable programs succeed at each stage, and contact owners.
 
 Revenue is subscriptions: free to browse, paid plans for analytics, deal flow, data export and
 listing. See [docs/architecture.md](docs/architecture.md) for the system design and plan details.
+
+The product is called LASO. The code, commands (`chorizo ...`), database and repository still
+use the earlier working name, Chorizo.
 
 ## Layout
 
@@ -76,6 +79,6 @@ make test
 
 ## Disclaimer
 
-Chorizo shows historical base rates and owner-provided information. It is not investment advice
+LASO shows historical base rates and owner-provided information. It is not investment advice
 and does not offer securities. Taking investment through the platform needs a registered funding
 portal or broker-dealer; see the roadmap in the architecture doc.

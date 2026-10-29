@@ -180,7 +180,7 @@ class Asset(TimestampMixin, Base):
     uses_biomarker_selection: Mapped[bool] = mapped_column(default=False)
     orphan_designation: Mapped[bool] = mapped_column(default=False)
     summary: Mapped[str | None] = mapped_column(Text)
-    # Where the record came from: "owner" (listed on Chorizo), "ctgov" (built from
+    # Where the record came from: "owner" (listed on LASO), "ctgov" (built from
     # ClinicalTrials.gov) or "demo". Benchmarks are computed from "ctgov" programs only.
     source: Mapped[str] = mapped_column(String(16), default="owner", index=True)
     # Stable identity for imported programs (normalized drug + therapeutic area).

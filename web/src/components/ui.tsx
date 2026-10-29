@@ -70,7 +70,7 @@ export function Loading() {
 export function ApiDown() {
   return (
     <div className="notice error">
-      Cannot reach the Chorizo API. Start it with <code>make api</code>.
+      Cannot reach the LASO API. Start it with <code>make api</code>.
     </div>
   );
 }

@@ -25,7 +25,7 @@ from chorizo.ingest.programs import fda_keys
 from chorizo.models import DrugApproval
 
 log = logging.getLogger(__name__)
-_HEADERS = {"User-Agent": "Chorizo/0.1 (+https://github.com/jpconeley/chorizo)"}
+_HEADERS = {"User-Agent": "LASO/0.1 (+https://github.com/jpconeley/chorizo)"}
 
 
 def _date(value: str | None) -> date | None:

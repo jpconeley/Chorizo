@@ -39,7 +39,7 @@ export default function TerminalLayout({ children }: LayoutProps<"/">) {
       <header className="topbar">
         <Link href="/screener" className="brand">
           <Logo />
-          CHORIZO
+          LASO
           <small>BIO TERMINAL</small>
         </Link>
         <nav className="fnkeys">

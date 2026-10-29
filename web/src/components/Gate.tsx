@@ -19,7 +19,7 @@ export function Gate() {
         <form action={action} className="gate-form">
           <div className="gate-brand">
             <Logo size={22} />
-            <span>CHORIZO</span>
+            <span>LASO</span>
           </div>
           <label>
             USER ID

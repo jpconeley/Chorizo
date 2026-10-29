@@ -11,7 +11,7 @@ export type ApiResult<T> =
 
 export type UpgradeRequired = { code: "upgrade_required"; feature: string; plan: string | null };
 
-/** Server-side fetch against the Chorizo API, sending the session token if present. */
+/** Server-side fetch against the LASO API, sending the session token if present. */
 export async function api<T>(path: string, init: RequestInit = {}): Promise<ApiResult<T>> {
   const token = (await cookies()).get(TOKEN_COOKIE)?.value;
   const headers = new Headers(init.headers);

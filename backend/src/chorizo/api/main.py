@@ -6,7 +6,7 @@ from chorizo.config import get_settings
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Chorizo API", version="0.1.0")
+    app = FastAPI(title="LASO API", version="0.1.0")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[get_settings().web_url],

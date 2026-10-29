@@ -48,7 +48,7 @@ async function ListingPageContent(props: PageProps<"/listings/[id]">) {
             </dl>
             {l.pitch && <p style={{ marginTop: 10 }}>{l.pitch}</p>}
             <p className="disclaimer">
-              Owner-provided information, not verified by Chorizo. Not an offer to sell securities.
+              Owner-provided information, not verified by LASO. Not an offer to sell securities.
             </p>
           </Panel>
         </div>

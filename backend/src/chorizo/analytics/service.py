@@ -15,7 +15,7 @@ from chorizo.analytics.benchmarks import (
 from chorizo.ingest.programs import SOURCE as CTGOV_SOURCE
 from chorizo.models import Asset, AssetStatus, PosEstimate, Stage, StageBenchmark, StageEvent
 
-COMPUTED_SOURCE = "ClinicalTrials.gov (Chorizo)"
+COMPUTED_SOURCE = "ClinicalTrials.gov (LASO)"
 GROUPINGS: list[tuple[str, ...]] = [(), ("therapeutic_area",), ("therapeutic_area", "modality")]
 # Filings aren't visible on ClinicalTrials.gov, so our Phase 3 "success" is reaching
 # approval: the computed Phase 3 rate already includes the regulatory step, and no
