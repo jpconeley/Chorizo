@@ -828,16 +828,10 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  margin-bottom: 8px;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.3em;
-}
-.gate-tag {
-  text-align: center;
-  font-size: 10px;
-  letter-spacing: 0.25em;
-  color: var(--accent);
-  margin-bottom: 6px;
 }
 .gate-form label {
   display: flex;
@@ -872,34 +866,12 @@ button:disabled {
   background: var(--accent);
   color: var(--accent-ink);
 }
-.gate-status {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--life);
+.gate-error {
   min-height: 1.4em;
-}
-.gate-status.error {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-align: center;
   color: var(--down);
-}
-.cursor {
-  display: inline-block;
-  width: 6px;
-  height: 10px;
-  margin-left: 4px;
-  background: currentColor;
-  vertical-align: -1px;
-  animation: blink 1s steps(1) infinite;
-}
-@keyframes blink {
-  50% {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .cursor {
-    animation: none;
-  }
 }
 
 form.stack {

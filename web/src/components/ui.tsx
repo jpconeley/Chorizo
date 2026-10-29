@@ -75,25 +75,31 @@ export function ApiDown() {
   );
 }
 
-/** Hexagon molecule mark: a benzene-style ring with a bonded node, in teal-to-green. */
+/** Prometheus' fire carried in a hexagon (science): a faceted flame with a violet core. */
 export function Logo({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
       <defs>
-        <linearGradient id="logo-grad" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id="logo-hex" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#19d3c5" />
+          <stop offset="1" stopColor="#3ee08f" />
+        </linearGradient>
+        <linearGradient id="logo-fire" x1="0" y1="1" x2="0" y2="0">
           <stop offset="0" stopColor="#19d3c5" />
           <stop offset="1" stopColor="#3ee08f" />
         </linearGradient>
       </defs>
       <polygon
-        points="12,2 20.66,7 20.66,17 12,22 3.34,17 3.34,7"
+        points="12,1.5 21.1,6.75 21.1,17.25 12,22.5 2.9,17.25 2.9,6.75"
         fill="none"
-        stroke="url(#logo-grad)"
-        strokeWidth="2"
+        stroke="url(#logo-hex)"
+        strokeWidth="1.6"
       />
-      <circle cx="12" cy="12" r="3.2" fill="#3ee08f" />
-      <line x1="12" y1="12" x2="20.66" y2="7" stroke="#19d3c5" strokeWidth="1.5" />
-      <circle cx="20.66" cy="7" r="1.8" fill="#9b8cff" />
+      <path
+        d="M12.6 3.8 L14.6 8.4 L14.1 10.9 L16.1 9.3 L17.3 13.4 Q17.3 17.9 12 19.7 Q6.7 17.9 6.7 13.6 L8.3 10.3 L9.7 12.3 L10.1 7.9 Z"
+        fill="url(#logo-fire)"
+      />
+      <path d="M12 11.2 L13.9 14.7 Q13.9 17.1 12 17.8 Q10.1 17.1 10.1 14.7 Z" fill="#9b8cff" />
     </svg>
   );
 }
