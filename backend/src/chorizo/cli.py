@@ -56,6 +56,7 @@ def run(args: argparse.Namespace) -> None:
                 print(f"benchmarks added: {seed.seed_reference(session)}")
             case "seed-demo":
                 seed.seed_demo(session)
+                seed.seed_demo_activity(session)
                 print(f"demo data loaded; demo users use password '{seed.DEMO_PASSWORD}'")
             case "ingest-ctgov":
                 count = ctgov.run(session, args.query, args.max_pages, _progress(time.monotonic()))

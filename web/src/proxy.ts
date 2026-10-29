@@ -5,13 +5,13 @@ const TOKEN_COOKIE = "chorizo_token"; // see lib/api.ts
 
 /**
  * The terminal sits behind the entry gate at "/": without a session cookie every page
- * sends you to the gate, and with one the gate sends you on to the screener. This is
+ * sends you to the gate, and with one the gate sends you on to your dashboard. This is
  * only an optimistic check; the API still verifies the token on every request.
  */
 export function proxy(request: NextRequest) {
   const signedIn = request.cookies.has(TOKEN_COOKIE);
   const atGate = request.nextUrl.pathname === "/";
-  if (atGate && signedIn) return NextResponse.redirect(new URL("/screener", request.url));
+  if (atGate && signedIn) return NextResponse.redirect(new URL("/dashboard", request.url));
   if (!atGate && !signedIn) return NextResponse.redirect(new URL("/", request.url));
   return NextResponse.next();
 }

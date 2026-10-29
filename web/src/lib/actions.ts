@@ -45,7 +45,7 @@ export async function enterTerminal(_: FormState, formData: FormData): Promise<F
     path: "/",
     maxAge: 60 * 60 * 24,
   });
-  redirect("/screener");
+  redirect("/dashboard");
 }
 
 export async function logout() {

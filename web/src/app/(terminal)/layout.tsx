@@ -10,6 +10,7 @@ import { logout } from "@/lib/actions";
 import { getMe } from "@/lib/api";
 
 const NAV = [
+  ["DASH", "/dashboard", "Your dashboard"],
   ["SCRN", "/screener", "Screener"],
   ["BENCH", "/benchmarks", "Stage benchmarks"],
   ["DEAL", "/listings", "Funding listings"],
@@ -37,7 +38,7 @@ export default function TerminalLayout({ children }: LayoutProps<"/">) {
   return (
     <>
       <header className="topbar">
-        <Link href="/screener" className="brand">
+        <Link href="/dashboard" className="brand">
           <Logo />
           LASO
           <small>BIO TERMINAL</small>

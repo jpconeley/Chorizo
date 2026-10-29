@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { CountUp } from "@/components/live";
+
 import { FEATURE_LABEL, label, pct } from "@/lib/format";
 import { STAGE_LABEL, STAGES, type Stage } from "@/lib/types";
 import type { UpgradeRequired } from "@/lib/api";
@@ -59,6 +61,19 @@ export function Locked({ upgrade }: { upgrade?: UpgradeRequired }) {
       <Link href="/pricing">
         See plans →
       </Link>
+    </div>
+  );
+}
+
+/** A headline figure that counts up when it appears. */
+export function StatTile({ label: name, value, note }: { label: string; value: number; note?: string }) {
+  return (
+    <div className="tile">
+      <span className="tile-label">{name}</span>
+      <span className="tile-value">
+        <CountUp value={value} />
+      </span>
+      {note && <span className="tile-note">{note}</span>}
     </div>
   );
 }

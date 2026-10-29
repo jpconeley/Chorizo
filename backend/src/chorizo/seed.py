@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from chorizo.models import (
     Asset,
     AssetStatus,
+    InvestorInterest,
     Listing,
     ListingDocument,
     ListingStatus,
@@ -22,6 +23,7 @@ from chorizo.models import (
     Subscription,
     SubscriptionStatus,
     User,
+    WatchlistItem,
 )
 from chorizo.plans import Plan
 from chorizo.security import hash_password
@@ -141,4 +143,49 @@ def seed_demo(session: Session) -> None:
             ),
         ]
     )
+    session.commit()
+
+
+def seed_demo_activity(session: Session) -> None:
+    """Give the institutional demo user something on their dashboard: a few followed drugs
+    (demo ones plus the real programs with the latest Phase 3 or approval moves) and an
+    offer on the demo listing. Safe to run repeatedly; adds only what's missing."""
+    user = session.scalar(select(User).where(User.email == "institutional@chorizo-demo.example.com"))
+    if user is None:
+        return
+    demo = list(session.scalars(select(Asset.id).where(Asset.name.in_(["DEMO-204", "DEMO-422", "DEMO-611"]))))
+    recent = list(
+        session.scalars(
+            select(StageEvent.asset_id)
+            .join(Asset, Asset.id == StageEvent.asset_id)
+            .where(
+                Asset.source == "ctgov",
+                StageEvent.stage.in_([Stage.PHASE3, Stage.APPROVED]),
+                StageEvent.entered_on <= date.today(),
+            )
+            .order_by(StageEvent.entered_on.desc())
+            .limit(20)
+        )
+    )
+    wanted = demo + list(dict.fromkeys(recent))[:3]
+    have = set(session.scalars(select(WatchlistItem.asset_id).where(WatchlistItem.user_id == user.id)))
+    session.add_all(WatchlistItem(user_id=user.id, asset_id=a) for a in wanted if a not in have)
+
+    listing = session.scalar(
+        select(Listing).join(Asset, Asset.id == Listing.asset_id).where(Asset.name == "DEMO-204")
+    )
+    already = listing and session.scalar(
+        select(InvestorInterest).where(
+            InvestorInterest.listing_id == listing.id, InvestorInterest.user_id == user.id
+        )
+    )
+    if listing and not already:
+        session.add(
+            InvestorInterest(
+                listing_id=listing.id,
+                user_id=user.id,
+                message="Interested in leading the Phase 2b round; can we see the dose-ranging data?",
+                indicative_amount_usd=5_000_000,
+            )
+        )
     session.commit()

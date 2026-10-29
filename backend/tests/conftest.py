@@ -28,6 +28,7 @@ def session():
 def seeded(session):
     seed.seed_reference(session)
     seed.seed_demo(session)
+    seed.seed_demo_activity(session)
     service.refresh_estimates(session)
     return session
 

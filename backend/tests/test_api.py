@@ -145,3 +145,42 @@ def test_search_matches_sponsor_and_ranks_prefix_first(client):
     assert by_sponsor["total"] == 6
     ranked = client.get("/v1/assets", params={"q": "DEMO-2"}).json()["items"]
     assert ranked[0]["name"] == "DEMO-204"
+
+
+def test_dashboard_for_investor_and_sponsor(client, seeded, login):
+    assert client.get("/v1/me/dashboard").status_code == 401
+
+    investor = client.get("/v1/me/dashboard", headers=login("institutional")).json()
+    following = {f["asset"]["name"]: f for f in investor["following"]}
+    assert set(following) == {"DEMO-204", "DEMO-422", "DEMO-611"}  # no ctgov programs in the test data
+    assert following["DEMO-422"]["latest"]["stage"] == "phase3"
+    assert following["DEMO-204"]["next_stage_probability"] is not None  # institutional sees PoS
+    assert [o["asset"] for o in investor["offers"]] == ["DEMO-204"]
+    kinds = {a["kind"] for a in investor["activity"]}
+    assert {"stage", "followed", "offer_sent"} <= kinds
+    moves = [a["asset"] for a in investor["activity"] if a["kind"] == "stage"]
+    assert sorted(moves) == sorted(set(moves))  # one latest move per followed drug
+    assert investor["activity"] == sorted(investor["activity"], key=lambda a: a["on"], reverse=True)
+
+    sponsor = client.get("/v1/me/dashboard", headers=login("sponsor")).json()
+    assert [(row["asset"], row["interest_count"]) for row in sponsor["listings"]] == [("DEMO-204", 1)]
+    assert sponsor["interest_received"][0]["investor"] == "institutional@chorizo-demo.example.com"
+    assert {"listing_created", "interest_received"} <= {a["kind"] for a in sponsor["activity"]}
+
+
+def test_demo_activity_is_idempotent(seeded):
+    from sqlalchemy import func
+
+    from chorizo import seed
+    from chorizo.models import InvestorInterest, WatchlistItem
+
+    before = (
+        seeded.scalar(select(func.count(WatchlistItem.id))),
+        seeded.scalar(select(func.count(InvestorInterest.id))),
+    )
+    seed.seed_demo_activity(seeded)
+    after = (
+        seeded.scalar(select(func.count(WatchlistItem.id))),
+        seeded.scalar(select(func.count(InvestorInterest.id))),
+    )
+    assert before == after

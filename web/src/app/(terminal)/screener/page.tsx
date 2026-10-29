@@ -1,8 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
 
-import { ApprovalsChart, PipelineChart } from "@/components/charts";
-import { CountUp } from "@/components/live";
 import { ScreenerControls } from "@/components/ScreenerControls";
 import { ApiDown, Bar, Loading, Panel, StageBadge } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -12,7 +10,6 @@ import {
   STAGES,
   type AssetPage,
   type Benchmark,
-  type MarketStats,
 } from "@/lib/types";
 
 const PAGE_SIZE = 50;
@@ -38,26 +35,6 @@ function preferredRates(rows: Benchmark[]): Benchmark[] {
 const throughApproval = (b: Benchmark) =>
   b.stage === "phase3" && !b.source.startsWith("BIO");
 
-function StatTile({
-  label: name,
-  value,
-  note,
-}: {
-  label: string;
-  value: number;
-  note?: string;
-}) {
-  return (
-    <div className="tile">
-      <span className="tile-label">{name}</span>
-      <span className="tile-value">
-        <CountUp value={value} />
-      </span>
-      {note && <span className="tile-note">{note}</span>}
-    </div>
-  );
-}
-
 async function ScreenerContent(props: PageProps<"/screener">) {
   const params = await props.searchParams;
   const query = new URLSearchParams();
@@ -72,10 +49,9 @@ async function ScreenerContent(props: PageProps<"/screener">) {
     return `/screener?${next}`;
   };
 
-  const [assets, benchmarks, stats] = await Promise.all([
+  const [assets, benchmarks] = await Promise.all([
     api<AssetPage>(`/assets?${query}&limit=${PAGE_SIZE}&offset=${offset}`),
     api<Benchmark[]>("/benchmarks"),
-    api<MarketStats>("/market/stats"),
   ]);
   if (!assets.ok) return <ApiDown />;
   const initial = {
@@ -87,22 +63,6 @@ async function ScreenerContent(props: PageProps<"/screener">) {
 
   return (
     <>
-      {stats.ok && (
-        <div className="tiles">
-          <StatTile label="Drug programs tracked" value={stats.data.programs} />
-          <StatTile label="In active development" value={stats.data.active} />
-          <StatTile label="Approved" value={stats.data.approved} />
-          <StatTile
-            label="Phase 3 starts, last 12 months"
-            value={stats.data.phase3_starts_12m}
-          />
-          <StatTile
-            label="Clinical trials"
-            value={stats.data.trials}
-            note="ClinicalTrials.gov"
-          />
-        </div>
-      )}
       <div className="grid">
         <div>
           <Panel
@@ -227,16 +187,6 @@ async function ScreenerContent(props: PageProps<"/screener">) {
               <Link href="/benchmarks">Full benchmarks →</Link>
             </p>
           </Panel>
-          {stats.ok && (
-            <>
-              <Panel title="Pipeline · active programs by stage">
-                <PipelineChart data={stats.data.pipeline} />
-              </Panel>
-              <Panel title="FDA approvals per year">
-                <ApprovalsChart data={stats.data.approvals_by_year} />
-              </Panel>
-            </>
-          )}
         </div>
       </div>
     </>

@@ -149,3 +149,50 @@ export type MarketStats = {
 export type FeedEvent = { asset_id: number; asset: string; stage: Stage; on: string; sponsor: string | null };
 
 export type SearchHit = { id: number; name: string; stage: Stage; indication: string; sponsor: string | null };
+
+export type DashboardData = {
+  following: {
+    asset: AssetSummary;
+    followed_on: string;
+    latest: { stage: Stage; on: string } | null;
+    next_stage_probability: number | null;
+    likelihood_of_approval: number | null;
+  }[];
+  offers: {
+    listing_id: number;
+    asset_id: number;
+    asset: string;
+    headline: string;
+    amount_sought_usd: string | null;
+    indicative_amount_usd: string | null;
+    message: string | null;
+    listing_status: string;
+    sent_on: string;
+  }[];
+  listings: {
+    listing_id: number;
+    asset_id: number;
+    asset: string;
+    headline: string;
+    status: string;
+    interest_count: number;
+    created_on: string;
+  }[];
+  interest_received: {
+    listing_id: number;
+    asset: string;
+    investor: string;
+    indicative_amount_usd: string | null;
+    message: string | null;
+    on: string;
+  }[];
+  activity: {
+    kind: "stage" | "followed" | "offer_sent" | "listing_created" | "interest_received";
+    on: string;
+    asset_id: number;
+    asset: string;
+    stage: Stage | null;
+    listing_id: number | null;
+    detail: string | null;
+  }[];
+};
