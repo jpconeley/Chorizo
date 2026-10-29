@@ -29,7 +29,7 @@ async function ListingPageContent(props: PageProps<"/listings/[id]">) {
           <Panel title="Deal">
             <dl className="kv">
               <dt>Seeking</dt>
-              <dd className="amber">{usd(l.amount_sought_usd)}</dd>
+              <dd className="life">{usd(l.amount_sought_usd)}</dd>
               <dt>Deal types</dt>
               <dd>{l.deal_types.map(label).join(", ") || "—"}</dd>
               <dt>Use of funds</dt>

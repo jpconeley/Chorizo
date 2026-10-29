@@ -25,7 +25,7 @@ export function Panel({
 }
 
 export function StageBadge({ stage }: { stage: Stage }) {
-  return <span className="stage">{STAGE_LABEL[stage]}</span>;
+  return <span className={`stage stage-${stage}`}>{STAGE_LABEL[stage]}</span>;
 }
 
 export function Bar({ value }: { value: number }) {
@@ -41,7 +41,7 @@ export function StageTimeline({ current }: { current: Stage }) {
   return (
     <div className="timeline">
       {STAGES.map((stage, i) => (
-        <div key={stage} className={i < index ? "done" : i === index ? "current" : ""}>
+        <div key={stage} className={`stage-${stage} ${i < index ? "done" : i === index ? "current" : ""}`}>
           {STAGE_LABEL[stage]}
         </div>
       ))}
@@ -56,7 +56,7 @@ export function Locked({ upgrade }: { upgrade?: UpgradeRequired }) {
     <div className="locked">
       <strong>{feature}</strong>
       Available on the {label(plan)} plan.{" "}
-      <Link href="/pricing" className="amber">
+      <Link href="/pricing">
         See plans →
       </Link>
     </div>
@@ -72,5 +72,28 @@ export function ApiDown() {
     <div className="notice error">
       Cannot reach the Chorizo API. Start it with <code>make api</code>.
     </div>
+  );
+}
+
+/** Hexagon molecule mark: a benzene-style ring with a bonded node, in teal-to-green. */
+export function Logo({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="logo-grad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#19d3c5" />
+          <stop offset="1" stopColor="#3ee08f" />
+        </linearGradient>
+      </defs>
+      <polygon
+        points="12,2 20.66,7 20.66,17 12,22 3.34,17 3.34,7"
+        fill="none"
+        stroke="url(#logo-grad)"
+        strokeWidth="2"
+      />
+      <circle cx="12" cy="12" r="3.2" fill="#3ee08f" />
+      <line x1="12" y1="12" x2="20.66" y2="7" stroke="#19d3c5" strokeWidth="1.5" />
+      <circle cx="20.66" cy="7" r="1.8" fill="#9b8cff" />
+    </svg>
   );
 }

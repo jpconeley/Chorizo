@@ -59,7 +59,7 @@ async function AccountContent(props: PageProps<"/account">) {
           <Panel title="Subscription">
             <p>
               Plan:{" "}
-              <span className="amber">{me.plans.length ? me.plans.map(label).join(" + ") : "Free"}</span>
+              <span className="accent">{me.plans.length ? me.plans.map(label).join(" + ") : "Free"}</span>
             </p>
             <ul style={{ listStyle: "none", margin: "10px 0" }} className="muted">
               {me.features.map((f) => (

@@ -40,7 +40,7 @@ async function ListingsContent() {
                     <StageBadge stage={l.asset.stage} />
                   </td>
                   <td className="wrap">{l.headline}</td>
-                  <td className="num amber">{usd(l.amount_sought_usd)}</td>
+                  <td className="num life">{usd(l.amount_sought_usd)}</td>
                   <td>{l.deal_types.map(label).join(", ")}</td>
                   <td className="muted">{l.asset.organization?.name ?? "—"}</td>
                 </tr>

@@ -3,6 +3,7 @@ import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { Logo } from "@/components/ui";
 import { getMe } from "@/lib/api";
 import { logout } from "@/lib/actions";
 import "./globals.css";
@@ -43,7 +44,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body>
         <header className="topbar">
           <Link href="/" className="brand">
+            <Logo />
             CHORIZO
+            <small>BIO TERMINAL</small>
           </Link>
           <nav className="fnkeys">
             {NAV.map(([key, href, title]) => (
@@ -59,7 +62,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </header>
         <main>{children}</main>
         <footer className="statusbar">
-          <span>DATA: ClinicalTrials.gov · BIO/Biomedtracker 2006–2015</span>
+          <span className="live">DATA: ClinicalTrials.gov · Drugs@FDA · BIO/Biomedtracker 2006–2015</span>
           <span>Not investment advice. Estimates are historical base rates, not predictions.</span>
         </footer>
       </body>
