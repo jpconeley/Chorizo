@@ -476,6 +476,117 @@ button:disabled {
   font-weight: 700;
 }
 
+/* Entry gate: nothing on screen but the tesseract and the access panel at its center. */
+.gate {
+  position: relative;
+  min-height: 100vh;
+  max-width: none;
+  padding: 16px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 50%, #0a2230 0%, #050d14 55%, #02060a 100%);
+  overflow: hidden;
+}
+.gate-stage {
+  display: contents;
+}
+.tesseract {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* No panel: the fields float inside the tesseract. A soft dark halo behind them keeps
+   them readable as the edges pass underneath. */
+.gate-form {
+  position: relative;
+  width: min(280px, 80vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 12px;
+  background: radial-gradient(closest-side, rgba(3, 9, 14, 0.85), rgba(3, 9, 14, 0.55) 70%, transparent);
+  text-shadow: 0 0 8px #02060a;
+}
+.gate-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+}
+.gate-tag {
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.gate-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+}
+.gate-form input {
+  padding: 6px 2px;
+  letter-spacing: 0.05em;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--accent-dim);
+}
+.gate-form input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+  box-shadow: 0 1px 0 var(--accent);
+}
+.gate-form button {
+  margin-top: 8px;
+  padding: 7px;
+  letter-spacing: 0.3em;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  text-shadow: none;
+}
+.gate-form button:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.gate-status {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--life);
+  min-height: 1.4em;
+}
+.gate-status.error {
+  color: var(--down);
+}
+.cursor {
+  display: inline-block;
+  width: 6px;
+  height: 10px;
+  margin-left: 4px;
+  background: currentColor;
+  vertical-align: -1px;
+  animation: blink 1s steps(1) infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cursor {
+    animation: none;
+  }
+}
+
 form.stack {
   display: flex;
   flex-direction: column;

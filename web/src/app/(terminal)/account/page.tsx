@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Account" };
 async function AccountContent(props: PageProps<"/account">) {
   const params = await props.searchParams;
   const me = await getMe();
-  if (!me) redirect("/login");
+  if (!me) redirect("/");
   const watchlist = me.features.includes("watchlists") ? await api<AssetSummary[]>("/watchlist") : null;
 
   return (

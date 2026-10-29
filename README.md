@@ -41,8 +41,11 @@ make api                           # API on http://localhost:8000 (docs at /docs
 make web                           # web app on http://localhost:3000 (in a second terminal)
 ```
 
-The demo users are `free@`, `pro@`, `institutional@` and `sponsor@chorizo-demo.example.com`.
-They all use the password `chorizo-demo-pass`, and each holds the plan in its name.
+The terminal opens at an entry gate. Locally (`CHORIZO_OPEN_GATE=1`, set in
+`docker-compose.yml`) any user ID and password get in, as the institutional demo user. Never set
+it in production. Real logins also work: the demo users are `free@`, `pro@`, `institutional@`
+and `sponsor@chorizo-demo.example.com`, all with the password `chorizo-demo-pass`, each holding
+the plan in its name.
 
 ## Data jobs
 
